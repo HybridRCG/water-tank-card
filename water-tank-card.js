@@ -4,25 +4,32 @@ class WaterTankCard extends HTMLElement {
   }
 
   set hass(hass) {
+    const needsRender = !this.hass || this.hasStateChanged(hass);
     this.hass = hass;
     
     if (!this.shadowRoot) {
       this.attachShadow({ mode: 'open' });
+      needsRender = true;
     }
     
-    // Store previous state to detect changes
+    if (needsRender) {
+      this.render();
+    }
+  }
+
+  hasStateChanged(newHass) {
+    if (!this.config) return false;
+    
     const entityLevelId = this.config.entity_level;
     const entityLitersId = this.config.entity_liters;
     
-    const newLevel = this.hass.states[entityLevelId]?.state;
-    const newLiters = this.hass.states[entityLitersId]?.state;
+    const oldLevel = this.hass?.states[entityLevelId]?.state;
+    const newLevel = newHass.states[entityLevelId]?.state;
     
-    // Check if values actually changed
-    if (this.prevLevel !== newLevel || this.prevLiters !== newLiters) {
-      this.prevLevel = newLevel;
-      this.prevLiters = newLiters;
-      this.render();
-    }
+    const oldLiters = this.hass?.states[entityLitersId]?.state;
+    const newLiters = newHass.states[entityLitersId]?.state;
+    
+    return oldLevel !== newLevel || oldLiters !== newLiters;
   }
 
   render() {
