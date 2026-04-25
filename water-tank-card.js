@@ -4,36 +4,29 @@ class WaterTankCard extends HTMLElement {
   }
 
   set hass(hass) {
-    const needsRender = !this.hass || this.hasStateChanged(hass);
     this.hass = hass;
     
     if (!this.shadowRoot) {
       this.attachShadow({ mode: 'open' });
-      needsRender = true;
     }
     
-    if (needsRender) {
+    // Store previous state to detect changes
+    const entityLevelId = this.config.entity_level;
+    const entityLitersId = this.config.entity_liters;
+    
+    const newLevel = this.hass.states[entityLevelId]?.state;
+    const newLiters = this.hass.states[entityLitersId]?.state;
+    
+    // Check if values actually changed (avoid setting hass again!)
+    if (this.prevLevel !== newLevel || this.prevLiters !== newLiters) {
+      this.prevLevel = newLevel;
+      this.prevLiters = newLiters;
       this.render();
     }
   }
 
-  hasStateChanged(newHass) {
-    if (!this.config) return false;
-    
-    const entityLevelId = this.config.entity_level;
-    const entityLitersId = this.config.entity_liters;
-    
-    const oldLevel = this.hass?.states[entityLevelId]?.state;
-    const newLevel = newHass.states[entityLevelId]?.state;
-    
-    const oldLiters = this.hass?.states[entityLitersId]?.state;
-    const newLiters = newHass.states[entityLitersId]?.state;
-    
-    return oldLevel !== newLevel || oldLiters !== newLiters;
-  }
-
   render() {
-    if (!this.shadowRoot) return;
+    if (!this.shadowRoot || !this.hass) return;
 
     const config = this.config;
     const entityLevelId = config.entity_level;
