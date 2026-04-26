@@ -1,36 +1,28 @@
 class WaterTankCard extends HTMLElement {
+  constructor() {
+    super();
+    this._hass = null;  // Private field for hass - NO setter recursion!
+  }
+
   setConfig(config) {
     this.config = config;
   }
 
   set hass(hass) {
-    // CRITICAL: Store hass FIRST, before doing anything else
-    const oldHass = this.hass;
-    this.hass = hass;
+    // Store in private field - never calls the setter again
+    this._hass = hass;
     
-    // Only render if shadowRoot doesn't exist
+    // Create shadowRoot on first call
     if (!this.shadowRoot) {
       this.attachShadow({ mode: 'open' });
-      this.render();
-      return; // Exit early - don't render twice
     }
     
-    // Don't re-render on every hass update - too expensive
-    // Just update the fill level if it changed
-    if (!oldHass || !this.config) return;
-    
-    const entityLevelId = this.config.entity_level;
-    const oldLevel = oldHass.states[entityLevelId]?.state;
-    const newLevel = hass.states[entityLevelId]?.state;
-    
-    // Only re-render if level actually changed
-    if (oldLevel !== newLevel) {
-      this.render();
-    }
+    // Always render - Home Assistant will handle updates efficiently
+    this.render();
   }
 
   render() {
-    if (!this.shadowRoot || !this.hass || !this.config) return;
+    if (!this.shadowRoot || !this._hass || !this.config) return;
 
     const entityLevelId = this.config.entity_level;
     const entityLitersId = this.config.entity_liters;
@@ -38,8 +30,8 @@ class WaterTankCard extends HTMLElement {
     const fillImage = this.config.fill_image || '/local/TANK/water_fill2.png';
     const title = this.config.title || 'Water Tank';
 
-    const level = this.hass.states[entityLevelId];
-    const liters = this.hass.states[entityLitersId];
+    const level = this._hass.states[entityLevelId];
+    const liters = this._hass.states[entityLitersId];
 
     if (!level) {
       this.shadowRoot.innerHTML = `<div style="padding: 16px; color: #d32f2f;">Entity ${entityLevelId} not found</div>`;
