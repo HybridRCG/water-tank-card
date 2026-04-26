@@ -1,9 +1,6 @@
 {
   "name": "Water Tank Card",
+  "version": "1.3.0",
   "codeowners": ["@HybridRCG"],
-  "documentation": "https://github.com/HybridRCG/water-tank-card",
-  "lovelace": {
-    "mode": "custom-element"
-  },
-  "version": "1.3.0"
+  "documentation": "https://github.com/HybridRCG/water-tank-card"
 }

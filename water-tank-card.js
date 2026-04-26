@@ -1,221 +1,251 @@
+const CARD_VERSION = '1.4.0';
+
 class WaterTankCard extends HTMLElement {
   constructor() {
     super();
     this._hass = null;
-  }
-
-  setConfig(config) {
-    this.config = config;
-  }
-
-  set hass(hass) {
-    this._hass = hass;
-    
-    if (!this.shadowRoot) {
-      this.attachShadow({ mode: 'open' });
-    }
-    
-    this.render();
-  }
-
-  render() {
-    if (!this.shadowRoot || !this._hass || !this.config) return;
-
-    const entityLevelId = this.config.entity_level;
-    const entityLitersId = this.config.entity_liters;
-    const backgroundImage = this.config.background_image || '/local/TANK/water_tank_background_clean.png';
-    const fillImage = this.config.fill_image || '/local/TANK/water_fill2.png';
-    const title = this.config.title || 'Water Tank';
-
-    const level = this._hass.states[entityLevelId];
-    const liters = this._hass.states[entityLitersId];
-
-    // Enhanced error reporting
-    if (!level) {
-      const similarEntities = Object.keys(this._hass.states)
-        .filter(k => k.toLowerCase().includes('tank') || k.toLowerCase().includes('level') || k.toLowerCase().includes('jojo'))
-        .slice(0, 10);
-      
-      this.shadowRoot.innerHTML = `
-        <div style="padding: 16px; color: #c62828; font-family: Arial, sans-serif;">
-          <h3 style="margin: 0 0 8px 0; color: #c62828;">❌ Entity Not Found</h3>
-          <p style="margin: 0 0 8px 0;"><strong>Looking for:</strong> ${entityLevelId}</p>
-          ${similarEntities.length > 0 ? `
-            <p style="margin: 0 0 8px 0;"><strong>Similar entities found:</strong></p>
-            <ul style="margin: 0; padding-left: 20px;">
-              ${similarEntities.map(e => `<li>${e}</li>`).join('')}
-            </ul>
-          ` : '<p style="margin: 0;">No similar entities found.</p>'}
-        </div>
-      `;
-      return;
-    }
-
-    // Parse level value - handle multiple formats
-    let levelValue = 0;
-    if (level.state !== undefined && level.state !== null && level.state !== 'unknown' && level.state !== 'unavailable') {
-      // Extract numeric value (handles "75.5%", "75.5", "75%" formats)
-      const match = String(level.state).match(/[\d.]+/);
-      if (match) {
-        const parsed = parseFloat(match[0]);
-        levelValue = isNaN(parsed) ? 0 : Math.min(100, Math.max(0, parsed));
-      }
-    }
-
-    // Parse liters value - extract number if it has units
-    let litersDisplay = 'N/A';
-    if (liters && liters.state !== undefined && liters.state !== null) {
-      // If it's a number with units like "250 L" or "250L", extract just the number
-      const match = String(liters.state).match(/[\d.]+/);
-      if (match) {
-        litersDisplay = match[0];
-        // Add unit if the state has one
-        if (String(liters.state).toLowerCase().includes('l')) {
-          litersDisplay += ' L';
-        }
-      } else {
-        litersDisplay = liters.state;
-      }
-    }
-
-    // Calculate fill height - constrain to usable tank area (approximately 75-85% of container)
-    // Tank typically has ~15% padding at top and bottom for the tank outline
-    const maxUsableHeight = 85; // Maximum fill height percentage
-    const minTankPadding = 8;   // Minimum padding at bottom (in % units)
-    
-    // Adjust fill so it fits within the visual tank boundaries
-    // When level is 95%, fill should be 95% of the USABLE space, not 95% of total
-    const adjustedFillHeight = Math.min(maxUsableHeight, Math.max(0, levelValue * (maxUsableHeight / 100)));
-
-    this.shadowRoot.innerHTML = `
-      <style>
-        :host {
-          display: block;
-          padding: 16px;
-        }
-        .card-title {
-          font-size: 16px;
-          font-weight: 500;
-          margin-bottom: 12px;
-          color: var(--primary-text-color, #212121);
-        }
-        .tank-container {
-          position: relative;
-          width: 100%;
-          max-width: 350px;
-          margin: 0 auto;
-          aspect-ratio: 1 / 1.2;
-          background-image: url('${backgroundImage}');
-          background-size: contain;
-          background-repeat: no-repeat;
-          background-position: center;
-          overflow: hidden;
-          border: 2px solid #ddd;
-          border-radius: 4px;
-          box-shadow: inset 0 0 8px rgba(0,0,0,0.05);
-        }
-        .tank-fill {
-          position: absolute;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          width: 100%;
-          height: ${adjustedFillHeight}%;
-          background-image: url('${fillImage}');
-          background-size: cover;
-          background-position: center bottom;
-          opacity: 0.9;
-          transition: height 0.8s ease-out;
-          z-index: 5;
-          border-top: 2px solid rgba(0,0,0,0.1);
-        }
-        .tank-level-text {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          font-size: 48px;
-          font-weight: bold;
-          color: #fff;
-          text-shadow: 
-            0 2px 4px rgba(0,0,0,0.6),
-            -2px -2px 4px rgba(0,0,0,0.3);
-          z-index: 10;
-          letter-spacing: 1px;
-        }
-        .tank-liters-text {
-          position: absolute;
-          bottom: 20px;
-          right: 20px;
-          font-size: 14px;
-          font-weight: 500;
-          color: #fff;
-          text-shadow: 0 1px 3px rgba(0,0,0,0.6);
-          z-index: 10;
-          background: rgba(0,0,0,0.2);
-          padding: 4px 8px;
-          border-radius: 3px;
-        }
-        .tank-stats {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 12px;
-          margin-top: 12px;
-          font-size: 13px;
-        }
-        .stat-item {
-          padding: 8px;
-          background: var(--card-background-color, #f5f5f5);
-          border-radius: 4px;
-          border-left: 3px solid #2196F3;
-        }
-        .stat-label {
-          font-size: 11px;
-          color: var(--secondary-text-color, #666);
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-        .stat-value {
-          font-size: 18px;
-          font-weight: bold;
-          color: var(--primary-text-color, #212121);
-          margin-top: 4px;
-        }
-      </style>
-      <div class="card-title">${title}</div>
-      <div class="tank-container">
-        <div class="tank-fill"></div>
-        <div class="tank-level-text">${Math.round(levelValue)}%</div>
-        <div class="tank-liters-text">Remaining: ${litersDisplay}</div>
-      </div>
-      <div class="tank-stats">
-        <div class="stat-item">
-          <div class="stat-label">Level</div>
-          <div class="stat-value">${Math.round(levelValue)}%</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-label">Remaining</div>
-          <div class="stat-value">${litersDisplay}</div>
-        </div>
-      </div>
-    `;
+    this._config = null;
+    this.attachShadow({ mode: 'open' });
   }
 
   static getStubConfig() {
     return {
-      entity_level: 'sensor.tank_level',
-      entity_liters: 'sensor.tank_liters',
+      entity_level: '',
+      entity_liters: '',
       title: 'Water Tank',
-      background_image: '/local/TANK/water_tank_background_clean.png',
-      fill_image: '/local/TANK/water_fill2.png',
     };
+  }
+
+  setConfig(config) {
+    if (!config.entity_level) {
+      throw new Error('Please define entity_level');
+    }
+    this._config = config;
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  getCardSize() {
+    return 5;
+  }
+
+  _render() {
+    if (!this.shadowRoot || !this._hass || !this._config) return;
+
+    const config = this._config;
+    const entityLevelId = config.entity_level;
+    const entityLitersId = config.entity_liters;
+    const tankImage = config.background_image || config.tank_image || '';
+    const title = config.title || 'Water Tank';
+
+    const level = this._hass.states[entityLevelId];
+    const liters = entityLitersId ? this._hass.states[entityLitersId] : null;
+
+    if (!level) {
+      this.shadowRoot.innerHTML = `
+        <ha-card header="${title}">
+          <div style="color:var(--error-color,#db4437);padding:16px;">
+            <p><b>Entity not found:</b> ${entityLevelId}</p>
+          </div>
+        </ha-card>`;
+      return;
+    }
+
+    let levelValue = 0;
+    if (level.state !== 'unknown' && level.state !== 'unavailable') {
+      const m = String(level.state).match(/[\d.]+/);
+      if (m) levelValue = Math.min(100, Math.max(0, parseFloat(m[0]) || 0));
+    }
+
+    let litersText = '';
+    if (liters && liters.state !== 'unknown' && liters.state !== 'unavailable') {
+      const m = String(liters.state).match(/[\d.]+/);
+      if (m) {
+        litersText = m[0];
+        const u = liters.attributes && liters.attributes.unit_of_measurement;
+        if (u) litersText += ' ' + u;
+      }
+    }
+
+    // The fill is a gradient from red (bottom) through yellow to green (top)
+    // positioned behind the tank image. The tank image acts as the frame/mask.
+    // We clip the gradient to the current level percentage.
+    const pct = Math.round(levelValue);
+    // Map fill from ~8% bottom to ~88% top of the tank image area
+    const tankTop = 8;
+    const tankBottom = 88;
+    const fillRange = tankBottom - tankTop;
+    const fillPx = (levelValue / 100) * fillRange;
+    const fillBottom = 100 - tankBottom;
+    const fillTop = 100 - tankBottom + fillPx;
+
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host { display: block; }
+        ha-card {
+          overflow: hidden;
+          background: transparent !important;
+        }
+        .tank-container {
+          position: relative;
+          width: 100%;
+          max-width: 360px;
+          margin: 0 auto;
+          padding: 8px 0 0 0;
+        }
+        .tank-visual {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 1 / 1.25;
+          overflow: hidden;
+        }
+        /* The gradient fill sits behind the tank image */
+        .tank-fill-layer {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          top: 0;
+          /* Full gradient from red at bottom to green at top */
+          background: linear-gradient(
+            to top,
+            #d32f2f 0%,
+            #e53935 10%,
+            #f57c00 25%,
+            #fbc02d 40%,
+            #cddc39 55%,
+            #8bc34a 70%,
+            #4caf50 85%,
+            #2e7d32 100%
+          );
+          /* Clip the gradient to only show up to the fill level */
+          clip-path: inset(${100 - fillTop}% 5% ${fillBottom}% 5%);
+          transition: clip-path 1s ease-out;
+          z-index: 1;
+        }
+        /* Wave effect at the water surface */
+        .tank-wave {
+          position: absolute;
+          left: 5%;
+          right: 5%;
+          height: 12px;
+          bottom: ${fillTop}%;
+          z-index: 2;
+          overflow: hidden;
+          transition: bottom 1s ease-out;
+        }
+        .tank-wave svg {
+          width: 200%;
+          height: 100%;
+          animation: wave 3s linear infinite;
+        }
+        @keyframes wave {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        /* Tank image overlays on top as the frame */
+        .tank-image {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          z-index: 3;
+          pointer-events: none;
+        }
+        .tank-image img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+        }
+        /* Percentage display */
+        .tank-pct {
+          position: absolute;
+          top: 45%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          font-size: 48px;
+          font-weight: 800;
+          color: #fff;
+          text-shadow: 0 2px 12px rgba(0,0,0,0.7), 0 0 4px rgba(0,0,0,0.3);
+          z-index: 4;
+          letter-spacing: 1px;
+        }
+        /* Stats bar below the tank */
+        .stats-bar {
+          display: flex;
+          margin: 8px 4px 4px 4px;
+          gap: 8px;
+        }
+        .stat-box {
+          flex: 1;
+          background: var(--card-background-color, rgba(40,40,40,0.6));
+          border-radius: 8px;
+          padding: 10px 12px;
+          text-align: center;
+        }
+        .stat-label {
+          font-size: 10px;
+          font-weight: 600;
+          color: var(--secondary-text-color, #999);
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          margin-bottom: 2px;
+        }
+        .stat-value {
+          font-size: 22px;
+          font-weight: 700;
+          color: var(--primary-text-color, #fff);
+        }
+      </style>
+      <ha-card>
+        <div class="tank-container">
+          <div class="tank-visual">
+            <div class="tank-fill-layer"></div>
+            <div class="tank-wave">
+              <svg viewBox="0 0 1200 20" preserveAspectRatio="none">
+                <path d="M0,10 C150,0 350,20 600,10 C850,0 1050,20 1200,10 L1200,20 L0,20 Z" fill="#4caf50" opacity="0.6"/>
+                <path d="M0,12 C200,2 400,22 600,12 C800,2 1000,22 1200,12 L1200,20 L0,20 Z" fill="#4caf50" opacity="0.4"/>
+              </svg>
+            </div>
+            ${tankImage ? `
+            <div class="tank-image">
+              <img src="${tankImage}" alt="tank" />
+            </div>` : ''}
+            <div class="tank-pct">${pct}%</div>
+          </div>
+          <div class="stats-bar">
+            <div class="stat-box">
+              <div class="stat-label">Level</div>
+              <div class="stat-value">${pct}%</div>
+            </div>
+            ${litersText ? `
+            <div class="stat-box">
+              <div class="stat-label">Remaining</div>
+              <div class="stat-value">${litersText}</div>
+            </div>` : ''}
+          </div>
+        </div>
+      </ha-card>`;
   }
 }
 
 customElements.define('water-tank-card', WaterTankCard);
+
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'water-tank-card',
   name: 'Water Tank Card',
-  description: 'Water tank level visualization with animation',
+  description: 'Visual water tank level card with fill animation',
+  preview: true,
+  documentationURL: 'https://github.com/HybridRCG/water-tank-card',
 });
+
+console.info(
+  '%c WATER-TANK-CARD %c v' + CARD_VERSION + ' ',
+  'color:#fff;background:#2e7d32;padding:2px 6px;border-radius:3px 0 0 3px;font-weight:bold;',
+  'color:#2e7d32;background:#e8f5e9;padding:2px 6px;border-radius:0 3px 3px 0;',
+);
