@@ -1,6 +1,6 @@
 {
   "name": "water-tank-card",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A custom Home Assistant card for displaying water tank levels with animated fill",
   "main": "water-tank-card.js",
   "repository": {

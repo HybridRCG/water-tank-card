@@ -9,6 +9,9 @@
   "homeassistant": "2024.1.0",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/HybridRCG/water-tank-card/issues",
+  "lovelace": {
+    "mode": "custom-element"
+  },
   "requirements": [],
-  "version": "1.0.1"
+  "version": "1.1.0"
 }
