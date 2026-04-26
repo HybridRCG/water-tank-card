@@ -28,36 +28,26 @@ class WaterTankCard extends HTMLElement {
     this._render();
   }
 
-  getCardSize() {
-    return 5;
-  }
+  getCardSize() { return 5; }
 
   _render() {
     if (!this.shadowRoot || !this._hass || !this._config) return;
-
-    const config = this._config;
-    const entityLevelId = config.entity_level;
-    const entityLitersId = config.entity_liters;
-    const tankImage = config.background_image || config.tank_image || '';
-    const title = config.title || 'Water Tank';
-
-    const level = this._hass.states[entityLevelId];
-    const liters = entityLitersId ? this._hass.states[entityLitersId] : null;
+    const c = this._config;
+    const level = this._hass.states[c.entity_level];
+    const liters = c.entity_liters ? this._hass.states[c.entity_liters] : null;
+    const title = c.title || 'Water Tank';
 
     if (!level) {
-      this.shadowRoot.innerHTML = `
-        <ha-card header="${title}">
-          <div style="color:var(--error-color,#db4437);padding:16px;">
-            <p><b>Entity not found:</b> ${entityLevelId}</p>
-          </div>
-        </ha-card>`;
+      this.shadowRoot.innerHTML = `<ha-card header="${title}">
+        <div style="color:#db4437;padding:16px"><b>Entity not found:</b> ${c.entity_level}</div>
+      </ha-card>`;
       return;
     }
 
-    let levelValue = 0;
+    let pct = 0;
     if (level.state !== 'unknown' && level.state !== 'unavailable') {
       const m = String(level.state).match(/[\d.]+/);
-      if (m) levelValue = Math.min(100, Math.max(0, parseFloat(m[0]) || 0));
+      if (m) pct = Math.min(100, Math.max(0, parseFloat(m[0]) || 0));
     }
 
     let litersText = '';
@@ -70,162 +60,175 @@ class WaterTankCard extends HTMLElement {
       }
     }
 
-    // The fill is a gradient from red (bottom) through yellow to green (top)
-    // positioned behind the tank image. The tank image acts as the frame/mask.
-    // We clip the gradient to the current level percentage.
-    const pct = Math.round(levelValue);
-    // Map fill from ~8% bottom to ~88% top of the tank image area
-    const tankTop = 8;
-    const tankBottom = 88;
-    const fillRange = tankBottom - tankTop;
-    const fillPx = (levelValue / 100) * fillRange;
-    const fillBottom = 100 - tankBottom;
-    const fillTop = 100 - tankBottom + fillPx;
+    const p = Math.round(pct);
+    // SVG tank dimensions
+    // viewBox: 0 0 300 380
+    // Tank body: x=40..260, top dome at y~60, bottom at y~340
+    // Lid: centered at top
+    // Ribs: horizontal bands with slight bulge on right side
+    // Fill: gradient clipped to tank interior shape
+
+    // The fill rises from bottom (y=340) to top (y=70)
+    // fillY = top of the water level
+    const tankTop = 70;
+    const tankBot = 340;
+    const range = tankBot - tankTop;
+    const fillY = tankBot - (pct / 100) * range;
+
+    // Color stops for the gradient (red bottom to green top)
+    // We want the gradient to always span the full tank height
+    // so colors correspond to absolute position in the tank
 
     this.shadowRoot.innerHTML = `
       <style>
         :host { display: block; }
-        ha-card {
-          overflow: hidden;
-          background: transparent !important;
-        }
-        .tank-container {
-          position: relative;
-          width: 100%;
-          max-width: 360px;
-          margin: 0 auto;
-          padding: 8px 0 0 0;
-        }
-        .tank-visual {
-          position: relative;
-          width: 100%;
-          aspect-ratio: 1 / 1.25;
-          overflow: hidden;
-        }
-        /* The gradient fill sits behind the tank image */
-        .tank-fill-layer {
-          position: absolute;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          top: 0;
-          /* Full gradient from red at bottom to green at top */
-          background: linear-gradient(
-            to top,
-            #d32f2f 0%,
-            #e53935 10%,
-            #f57c00 25%,
-            #fbc02d 40%,
-            #cddc39 55%,
-            #8bc34a 70%,
-            #4caf50 85%,
-            #2e7d32 100%
-          );
-          /* Clip the gradient to only show up to the fill level */
-          clip-path: inset(${100 - fillTop}% 5% ${fillBottom}% 5%);
-          transition: clip-path 1s ease-out;
-          z-index: 1;
-        }
-        /* Wave effect at the water surface */
-        .tank-wave {
-          position: absolute;
-          left: 5%;
-          right: 5%;
-          height: 12px;
-          bottom: ${fillTop}%;
-          z-index: 2;
-          overflow: hidden;
-          transition: bottom 1s ease-out;
-        }
-        .tank-wave svg {
-          width: 200%;
-          height: 100%;
-          animation: wave 3s linear infinite;
-        }
-        @keyframes wave {
+        ha-card { overflow: hidden; background: transparent !important; }
+        .card-wrap { padding: 12px 12px 8px; }
+        .tank-svg { display: block; width: 100%; max-width: 320px; margin: 0 auto; }
+        @keyframes waveMove {
           0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
+          100% { transform: translateX(-120px); }
         }
-        /* Tank image overlays on top as the frame */
-        .tank-image {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          z-index: 3;
-          pointer-events: none;
+        .wave-line {
+          animation: waveMove 4s linear infinite;
         }
-        .tank-image img {
-          width: 100%;
-          height: 100%;
-          object-fit: contain;
-        }
-        /* Percentage display */
-        .tank-pct {
-          position: absolute;
-          top: 45%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          font-size: 48px;
-          font-weight: 800;
-          color: #fff;
-          text-shadow: 0 2px 12px rgba(0,0,0,0.7), 0 0 4px rgba(0,0,0,0.3);
-          z-index: 4;
-          letter-spacing: 1px;
-        }
-        /* Stats bar below the tank */
         .stats-bar {
-          display: flex;
-          margin: 8px 4px 4px 4px;
-          gap: 8px;
+          display: flex; margin: 10px 0 0; gap: 8px;
         }
         .stat-box {
-          flex: 1;
-          background: var(--card-background-color, rgba(40,40,40,0.6));
-          border-radius: 8px;
-          padding: 10px 12px;
-          text-align: center;
+          flex: 1; background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 10px; padding: 10px 8px; text-align: center;
         }
         .stat-label {
-          font-size: 10px;
-          font-weight: 600;
-          color: var(--secondary-text-color, #999);
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          margin-bottom: 2px;
+          font-size: 10px; font-weight: 600; letter-spacing: 1.2px;
+          color: var(--secondary-text-color, #888); text-transform: uppercase;
         }
-        .stat-value {
-          font-size: 22px;
-          font-weight: 700;
+        .stat-val {
+          font-size: 22px; font-weight: 700; margin-top: 2px;
           color: var(--primary-text-color, #fff);
         }
       </style>
       <ha-card>
-        <div class="tank-container">
-          <div class="tank-visual">
-            <div class="tank-fill-layer"></div>
-            <div class="tank-wave">
-              <svg viewBox="0 0 1200 20" preserveAspectRatio="none">
-                <path d="M0,10 C150,0 350,20 600,10 C850,0 1050,20 1200,10 L1200,20 L0,20 Z" fill="#4caf50" opacity="0.6"/>
-                <path d="M0,12 C200,2 400,22 600,12 C800,2 1000,22 1200,12 L1200,20 L0,20 Z" fill="#4caf50" opacity="0.4"/>
-              </svg>
-            </div>
-            ${tankImage ? `
-            <div class="tank-image">
-              <img src="${tankImage}" alt="tank" />
-            </div>` : ''}
-            <div class="tank-pct">${pct}%</div>
-          </div>
+        <div class="card-wrap">
+          <svg class="tank-svg" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <!-- Gradient for the fill: red at bottom, green at top -->
+              <linearGradient id="fillGrad" x1="0" y1="1" x2="0" y2="0">
+                <stop offset="0%" stop-color="#d32f2f"/>
+                <stop offset="15%" stop-color="#e53935"/>
+                <stop offset="30%" stop-color="#f57c00"/>
+                <stop offset="50%" stop-color="#fbc02d"/>
+                <stop offset="70%" stop-color="#cddc39"/>
+                <stop offset="85%" stop-color="#66bb6a"/>
+                <stop offset="100%" stop-color="#43a047"/>
+              </linearGradient>
+
+              <!-- Tank interior shape for clipping the fill -->
+              <clipPath id="tankClip">
+                <path d="
+                  M 60,70
+                  Q 60,55 150,52
+                  Q 240,55 240,70
+                  L 244,100
+                  Q 248,120 248,140
+                  L 252,170
+                  Q 256,190 252,210
+                  L 248,240
+                  Q 244,260 248,280
+                  L 252,310
+                  Q 254,330 245,340
+                  Q 240,345 150,348
+                  Q 60,345 55,340
+                  Q 46,330 48,310
+                  L 52,280
+                  Q 56,260 52,240
+                  L 48,210
+                  Q 44,190 48,170
+                  L 52,140
+                  Q 56,120 52,100
+                  Z
+                "/>
+              </clipPath>
+            </defs>
+
+            <!-- Fill: gradient rectangle clipped to tank shape, height based on level -->
+            <g clip-path="url(#tankClip)">
+              <rect x="40" y="${fillY}" width="220" height="${tankBot - fillY}" fill="url(#fillGrad)" opacity="0.88"/>
+
+              <!-- Animated wave at water surface -->
+              ${pct > 2 ? `
+              <g class="wave-line">
+                <path d="
+                  M 30,${fillY}
+                  q 15,-8 30,0 t 30,0 t 30,0 t 30,0 t 30,0 t 30,0 t 30,0 t 30,0 t 30,0
+                  L 300,${fillY + 15}
+                  L 30,${fillY + 15} Z
+                " fill="rgba(255,255,255,0.15)"/>
+              </g>` : ''}
+            </g>
+
+            <!-- Tank body outline with ribs (JoJo style) -->
+            <path d="
+              M 60,70
+              Q 60,55 150,52
+              Q 240,55 240,70
+              L 244,100
+              Q 248,120 248,140
+              L 252,170
+              Q 256,190 252,210
+              L 248,240
+              Q 244,260 248,280
+              L 252,310
+              Q 254,330 245,340
+              Q 240,345 150,348
+              Q 60,345 55,340
+              Q 46,330 48,310
+              L 52,280
+              Q 56,260 52,240
+              L 48,210
+              Q 44,190 48,170
+              L 52,140
+              Q 56,120 52,100
+              Z
+            " fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2.5"/>
+
+            <!-- Horizontal rib lines -->
+            <path d="M 52,100 Q 150,95 244,100" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+            <path d="M 48,140 Q 150,135 252,140" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+            <path d="M 48,175 Q 150,170 252,175" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+            <path d="M 48,210 Q 150,205 252,210" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+            <path d="M 52,245 Q 150,240 248,245" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+            <path d="M 48,280 Q 150,275 252,280" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+            <path d="M 48,310 Q 150,305 252,310" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+
+            <!-- Lid on top of dome -->
+            <path d="M 130,52 L 130,42 Q 130,38 134,38 L 166,38 Q 170,38 170,42 L 170,52" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
+            <rect x="140" y="32" width="20" height="8" rx="3" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="1.5"/>
+
+            <!-- Percentage text -->
+            <text x="150" y="215" text-anchor="middle" dominant-baseline="central"
+              font-size="52" font-weight="800" fill="#fff"
+              style="text-shadow: 0 2px 8px rgba(0,0,0,0.6);"
+              filter="url(#textShadow)">${p}%</text>
+
+            <!-- Text shadow filter -->
+            <defs>
+              <filter id="textShadow" x="-10%" y="-10%" width="120%" height="120%">
+                <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="rgba(0,0,0,0.7)"/>
+              </filter>
+            </defs>
+          </svg>
+
           <div class="stats-bar">
             <div class="stat-box">
               <div class="stat-label">Level</div>
-              <div class="stat-value">${pct}%</div>
+              <div class="stat-val">${p}%</div>
             </div>
             ${litersText ? `
             <div class="stat-box">
               <div class="stat-label">Remaining</div>
-              <div class="stat-value">${litersText}</div>
+              <div class="stat-val">${litersText}</div>
             </div>` : ''}
           </div>
         </div>
@@ -234,16 +237,14 @@ class WaterTankCard extends HTMLElement {
 }
 
 customElements.define('water-tank-card', WaterTankCard);
-
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'water-tank-card',
   name: 'Water Tank Card',
-  description: 'Visual water tank level card with fill animation',
+  description: 'SVG water tank level card with gradient fill',
   preview: true,
   documentationURL: 'https://github.com/HybridRCG/water-tank-card',
 });
-
 console.info(
   '%c WATER-TANK-CARD %c v' + CARD_VERSION + ' ',
   'color:#fff;background:#2e7d32;padding:2px 6px;border-radius:3px 0 0 3px;font-weight:bold;',
