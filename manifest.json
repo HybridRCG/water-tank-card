@@ -10,8 +10,19 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/HybridRCG/water-tank-card/issues",
   "lovelace": {
-    "mode": "custom-element"
+    "mode": "custom-element",
+    "resources": [
+      {
+        "url": "/hacsfiles/water-tank-card/water-tank-card.js",
+        "type": "module"
+      }
+    ]
   },
   "requirements": [],
-  "version": "1.1.0"
+  "version": "1.1.1",
+  "hacs": {
+    "category": "lovelace",
+    "zip_release": true,
+    "filename": "water-tank-card.js"
+  }
 }
