@@ -92,22 +92,6 @@ class WaterTankCard extends HTMLElement {
         .wave-line {
           animation: waveMove 4s linear infinite;
         }
-        .stats-bar {
-          display: flex; margin: 10px 0 0; gap: 8px;
-        }
-        .stat-box {
-          flex: 1; background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 10px; padding: 10px 8px; text-align: center;
-        }
-        .stat-label {
-          font-size: 10px; font-weight: 600; letter-spacing: 1.2px;
-          color: var(--secondary-text-color, #888); text-transform: uppercase;
-        }
-        .stat-val {
-          font-size: 22px; font-weight: 700; margin-top: 2px;
-          color: var(--primary-text-color, #fff);
-        }
       </style>
       <ha-card>
         <div class="card-wrap">
@@ -207,7 +191,7 @@ class WaterTankCard extends HTMLElement {
             <rect x="140" y="32" width="20" height="8" rx="3" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="1.5"/>
 
             <!-- Percentage text -->
-            <text x="150" y="215" text-anchor="middle" dominant-baseline="central"
+            <text x="150" y="235" text-anchor="middle" dominant-baseline="central"
               font-size="52" font-weight="800" fill="#fff"
               style="text-shadow: 0 2px 8px rgba(0,0,0,0.6);"
               filter="url(#textShadow)">${p}%</text>
@@ -220,17 +204,6 @@ class WaterTankCard extends HTMLElement {
             </defs>
           </svg>
 
-          <div class="stats-bar">
-            <div class="stat-box">
-              <div class="stat-label">Level</div>
-              <div class="stat-val">${p}%</div>
-            </div>
-            ${litersText ? `
-            <div class="stat-box">
-              <div class="stat-label">Remaining</div>
-              <div class="stat-val">${litersText}</div>
-            </div>` : ''}
-          </div>
         </div>
       </ha-card>`;
   }
