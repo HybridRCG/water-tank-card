@@ -1,7 +1,7 @@
 class WaterTankCard extends HTMLElement {
   constructor() {
     super();
-    this._hass = null;  // Private field for hass - NO setter recursion!
+    this._hass = null;
   }
 
   setConfig(config) {
@@ -9,15 +9,12 @@ class WaterTankCard extends HTMLElement {
   }
 
   set hass(hass) {
-    // Store in private field - never calls the setter again
     this._hass = hass;
     
-    // Create shadowRoot on first call
     if (!this.shadowRoot) {
       this.attachShadow({ mode: 'open' });
     }
     
-    // Always render - Home Assistant will handle updates efficiently
     this.render();
   }
 
@@ -33,13 +30,54 @@ class WaterTankCard extends HTMLElement {
     const level = this._hass.states[entityLevelId];
     const liters = this._hass.states[entityLitersId];
 
+    // Enhanced error reporting
     if (!level) {
-      this.shadowRoot.innerHTML = `<div style="padding: 16px; color: #d32f2f;">Entity ${entityLevelId} not found</div>`;
+      const similarEntities = Object.keys(this._hass.states)
+        .filter(k => k.toLowerCase().includes('tank') || k.toLowerCase().includes('level') || k.toLowerCase().includes('jojo'))
+        .slice(0, 10);
+      
+      this.shadowRoot.innerHTML = `
+        <div style="padding: 16px; color: #c62828; font-family: Arial, sans-serif;">
+          <h3 style="margin: 0 0 8px 0; color: #c62828;">❌ Entity Not Found</h3>
+          <p style="margin: 0 0 8px 0;"><strong>Looking for:</strong> ${entityLevelId}</p>
+          ${similarEntities.length > 0 ? `
+            <p style="margin: 0 0 8px 0;"><strong>Similar entities found:</strong></p>
+            <ul style="margin: 0; padding-left: 20px;">
+              ${similarEntities.map(e => `<li>${e}</li>`).join('')}
+            </ul>
+          ` : '<p style="margin: 0;">No similar entities found.</p>'}
+        </div>
+      `;
       return;
     }
 
-    const levelValue = parseFloat(level.state) || 0;
-    const litersValue = liters ? liters.state : 'N/A';
+    // Parse level value - handle multiple formats
+    let levelValue = 0;
+    if (level.state !== undefined && level.state !== null && level.state !== 'unknown' && level.state !== 'unavailable') {
+      // Extract numeric value (handles "75.5%", "75.5", "75%" formats)
+      const match = String(level.state).match(/[\d.]+/);
+      if (match) {
+        const parsed = parseFloat(match[0]);
+        levelValue = isNaN(parsed) ? 0 : Math.min(100, Math.max(0, parsed));
+      }
+    }
+
+    // Parse liters value - extract number if it has units
+    let litersDisplay = 'N/A';
+    if (liters && liters.state !== undefined && liters.state !== null) {
+      // If it's a number with units like "250 L" or "250L", extract just the number
+      const match = String(liters.state).match(/[\d.]+/);
+      if (match) {
+        litersDisplay = match[0];
+        // Add unit if the state has one
+        if (String(liters.state).toLowerCase().includes('l')) {
+          litersDisplay += ' L';
+        }
+      } else {
+        litersDisplay = liters.state;
+      }
+    }
+
     const fillHeight = Math.min(100, Math.max(0, levelValue));
 
     this.shadowRoot.innerHTML = `
@@ -52,7 +90,7 @@ class WaterTankCard extends HTMLElement {
           font-size: 16px;
           font-weight: 500;
           margin-bottom: 12px;
-          color: var(--primary-text-color);
+          color: var(--primary-text-color, #212121);
         }
         .tank-container {
           position: relative;
@@ -65,6 +103,9 @@ class WaterTankCard extends HTMLElement {
           background-repeat: no-repeat;
           background-position: center;
           overflow: hidden;
+          border: 2px solid #ddd;
+          border-radius: 4px;
+          box-shadow: inset 0 0 8px rgba(0,0,0,0.05);
         }
         .tank-fill {
           position: absolute;
@@ -76,9 +117,10 @@ class WaterTankCard extends HTMLElement {
           background-image: url('${fillImage}');
           background-size: cover;
           background-position: center bottom;
-          opacity: 0.85;
-          transition: height 0.5s ease-out;
+          opacity: 0.9;
+          transition: height 0.8s ease-out;
           z-index: 5;
+          border-top: 2px solid rgba(0,0,0,0.1);
         }
         .tank-level-text {
           position: absolute;
@@ -87,25 +129,67 @@ class WaterTankCard extends HTMLElement {
           transform: translate(-50%, -50%);
           font-size: 48px;
           font-weight: bold;
-          color: white;
-          text-shadow: 0 2px 6px rgba(0,0,0,0.5);
+          color: #fff;
+          text-shadow: 
+            0 2px 4px rgba(0,0,0,0.6),
+            -2px -2px 4px rgba(0,0,0,0.3);
           z-index: 10;
+          letter-spacing: 1px;
         }
         .tank-liters-text {
           position: absolute;
           bottom: 20px;
           right: 20px;
           font-size: 14px;
-          color: white;
-          text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+          font-weight: 500;
+          color: #fff;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.6);
           z-index: 10;
+          background: rgba(0,0,0,0.2);
+          padding: 4px 8px;
+          border-radius: 3px;
+        }
+        .tank-stats {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+          margin-top: 12px;
+          font-size: 13px;
+        }
+        .stat-item {
+          padding: 8px;
+          background: var(--card-background-color, #f5f5f5);
+          border-radius: 4px;
+          border-left: 3px solid #2196F3;
+        }
+        .stat-label {
+          font-size: 11px;
+          color: var(--secondary-text-color, #666);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .stat-value {
+          font-size: 18px;
+          font-weight: bold;
+          color: var(--primary-text-color, #212121);
+          margin-top: 4px;
         }
       </style>
       <div class="card-title">${title}</div>
       <div class="tank-container">
         <div class="tank-fill"></div>
         <div class="tank-level-text">${Math.round(levelValue)}%</div>
-        <div class="tank-liters-text">Remaining: ${litersValue} L</div>
+        <div class="tank-liters-text">Remaining: ${litersDisplay}</div>
+      </div>
+      <div class="tank-stats">
+        <div class="stat-item">
+          <div class="stat-label">Level</div>
+          <div class="stat-value">${Math.round(levelValue)}%</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Remaining</div>
+          <div class="stat-value">${litersDisplay}</div>
+        </div>
       </div>
     `;
   }
