@@ -4,46 +4,45 @@ class WaterTankCard extends HTMLElement {
   }
 
   set hass(hass) {
+    // CRITICAL: Store hass FIRST, before doing anything else
+    const oldHass = this.hass;
     this.hass = hass;
     
+    // Only render if shadowRoot doesn't exist
     if (!this.shadowRoot) {
       this.attachShadow({ mode: 'open' });
+      this.render();
+      return; // Exit early - don't render twice
     }
     
-    // Store previous state to detect changes
+    // Don't re-render on every hass update - too expensive
+    // Just update the fill level if it changed
+    if (!oldHass || !this.config) return;
+    
     const entityLevelId = this.config.entity_level;
-    const entityLitersId = this.config.entity_liters;
+    const oldLevel = oldHass.states[entityLevelId]?.state;
+    const newLevel = hass.states[entityLevelId]?.state;
     
-    const newLevel = this.hass.states[entityLevelId]?.state;
-    const newLiters = this.hass.states[entityLitersId]?.state;
-    
-    // Check if values actually changed (avoid setting hass again!)
-    if (this.prevLevel !== newLevel || this.prevLiters !== newLiters) {
-      this.prevLevel = newLevel;
-      this.prevLiters = newLiters;
+    // Only re-render if level actually changed
+    if (oldLevel !== newLevel) {
       this.render();
     }
   }
 
   render() {
-    if (!this.shadowRoot || !this.hass) return;
+    if (!this.shadowRoot || !this.hass || !this.config) return;
 
-    const config = this.config;
-    const entityLevelId = config.entity_level;
-    const entityLitersId = config.entity_liters;
-    const backgroundImage = config.background_image || '/local/TANK/water_tank_background_clean.png';
-    const fillImage = config.fill_image || '/local/TANK/water_fill2.png';
-    const title = config.title || 'Water Tank';
+    const entityLevelId = this.config.entity_level;
+    const entityLitersId = this.config.entity_liters;
+    const backgroundImage = this.config.background_image || '/local/TANK/water_tank_background_clean.png';
+    const fillImage = this.config.fill_image || '/local/TANK/water_fill2.png';
+    const title = this.config.title || 'Water Tank';
 
     const level = this.hass.states[entityLevelId];
     const liters = this.hass.states[entityLitersId];
 
     if (!level) {
-      this.shadowRoot.innerHTML = `
-        <div style="padding: 16px; color: #d32f2f;">
-          Entity ${entityLevelId} not found
-        </div>
-      `;
+      this.shadowRoot.innerHTML = `<div style="padding: 16px; color: #d32f2f;">Entity ${entityLevelId} not found</div>`;
       return;
     }
 
@@ -56,18 +55,13 @@ class WaterTankCard extends HTMLElement {
         :host {
           display: block;
           padding: 16px;
-          background: var(--ha-card-background, var(--card-background-color, #fff));
-          border-radius: 12px;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        
         .card-title {
           font-size: 16px;
           font-weight: 500;
           margin-bottom: 12px;
-          color: var(--ha-card-header-color, var(--primary-text-color));
+          color: var(--primary-text-color);
         }
-        
         .tank-container {
           position: relative;
           width: 100%;
@@ -79,9 +73,7 @@ class WaterTankCard extends HTMLElement {
           background-repeat: no-repeat;
           background-position: center;
           overflow: hidden;
-          border-radius: 8px;
         }
-        
         .tank-fill {
           position: absolute;
           bottom: 0;
@@ -96,7 +88,6 @@ class WaterTankCard extends HTMLElement {
           transition: height 0.5s ease-out;
           z-index: 5;
         }
-        
         .tank-level-text {
           position: absolute;
           top: 50%;
@@ -107,9 +98,7 @@ class WaterTankCard extends HTMLElement {
           color: white;
           text-shadow: 0 2px 6px rgba(0,0,0,0.5);
           z-index: 10;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
-        
         .tank-liters-text {
           position: absolute;
           bottom: 20px;
@@ -118,22 +107,15 @@ class WaterTankCard extends HTMLElement {
           color: white;
           text-shadow: 0 2px 4px rgba(0,0,0,0.5);
           z-index: 10;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
       </style>
-      
       <div class="card-title">${title}</div>
-      
       <div class="tank-container">
         <div class="tank-fill"></div>
         <div class="tank-level-text">${Math.round(levelValue)}%</div>
         <div class="tank-liters-text">Remaining: ${litersValue} L</div>
       </div>
     `;
-  }
-
-  static getConfigElement() {
-    return document.createElement('water-tank-card-editor');
   }
 
   static getStubConfig() {
@@ -148,10 +130,9 @@ class WaterTankCard extends HTMLElement {
 }
 
 customElements.define('water-tank-card', WaterTankCard);
-
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'water-tank-card',
   name: 'Water Tank Card',
-  description: 'A custom card to display water tank level with fill animation',
+  description: 'Water tank level visualization with animation',
 });
