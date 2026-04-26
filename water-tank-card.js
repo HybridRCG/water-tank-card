@@ -78,7 +78,14 @@ class WaterTankCard extends HTMLElement {
       }
     }
 
-    const fillHeight = Math.min(100, Math.max(0, levelValue));
+    // Calculate fill height - constrain to usable tank area (approximately 75-85% of container)
+    // Tank typically has ~15% padding at top and bottom for the tank outline
+    const maxUsableHeight = 85; // Maximum fill height percentage
+    const minTankPadding = 8;   // Minimum padding at bottom (in % units)
+    
+    // Adjust fill so it fits within the visual tank boundaries
+    // When level is 95%, fill should be 95% of the USABLE space, not 95% of total
+    const adjustedFillHeight = Math.min(maxUsableHeight, Math.max(0, levelValue * (maxUsableHeight / 100)));
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -113,7 +120,7 @@ class WaterTankCard extends HTMLElement {
           left: 0;
           right: 0;
           width: 100%;
-          height: ${fillHeight}%;
+          height: ${adjustedFillHeight}%;
           background-image: url('${fillImage}');
           background-size: cover;
           background-position: center bottom;
