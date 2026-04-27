@@ -1,4 +1,4 @@
-const CARD_VERSION = '1.7.0';
+const CARD_VERSION = '1.8.0';
 
 class WaterTankCard extends HTMLElement {
   constructor() {
@@ -149,16 +149,9 @@ class WaterTankCard extends HTMLElement {
             <path d="M 130,${domeY - 10} L 130,${domeY - 22} Q 130,${domeY - 26} 134,${domeY - 26} L 166,${domeY - 26} Q 170,${domeY - 26} 170,${domeY - 22} L 170,${domeY - 10}" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
             <rect x="140" y="${domeY - 32}" width="20" height="7" rx="3" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="1.5"/>
 
-            <!-- Pump icon (water-pump) centered in tank, above water -->
-            <g class="pump-icon" transform="translate(150, ${pumpY})" style="filter: ${pumpGlow}">
-              <g transform="translate(-14, -14) scale(1.2)">
-                <path d="M12 3 L12 6 M6 12 L3 12 M12 18 L12 21 M18 12 L21 12
-                  M7.05 7.05 L4.93 4.93 M16.95 7.05 L19.07 4.93
-                  M7.05 16.95 L4.93 19.07 M16.95 16.95 L19.07 19.07"
-                  stroke="${pumpColor}" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.5"/>
-                <circle cx="12" cy="12" r="5" fill="none" stroke="${pumpColor}" stroke-width="2"/>
-                <path d="M12 9 C14 9 15 10.5 15 12 C15 13.5 14 15 12 15 C10 15 9 13.5 9 12 L12 12 Z" fill="${pumpColor}" opacity="0.7"/>
-              </g>
+            <!-- Pump icon (mdi:water-pump) centered in tank, above water -->
+            <g class="pump-icon" transform="translate(${150 - 15}, ${pumpY - 15}) scale(1.25)" style="filter: ${pumpGlow}">
+              <path d="M19,14.5C19,14.5 21,16.67 21,18A2,2 0 0,1 19,20A2,2 0 0,1 17,18C17,16.67 19,14.5 19,14.5M5,18V9A2,2 0 0,1 3,7A2,2 0 0,1 5,5V4A2,2 0 0,1 7,2H9A2,2 0 0,1 11,4V5H19A2,2 0 0,1 21,7V9L21,11A1,1 0 0,1 22,12A1,1 0 0,1 21,13H17A1,1 0 0,1 16,12A1,1 0 0,1 17,11V9H11V18H12A2,2 0 0,1 14,20V22H2V20A2,2 0 0,1 4,18H5Z" fill="${pumpColor}"/>
             </g>
 
             <!-- Percentage -->
