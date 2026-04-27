@@ -4,6 +4,8 @@ A custom Home Assistant Lovelace card for displaying water tank levels with smoo
 
 <img width="145" height="132" alt="Water Tank" src="https://github.com/user-attachments/assets/6d682f7d-7814-48b7-a4d6-9b2bc476cbc3" />
 
+[![Buy Me A Coffee](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/hybridrcg)
+
 ## Features
 
 - 🌊 Animated water fill from bottom up based on sensor value
@@ -68,6 +70,8 @@ fill_image: /local/TANK/water_fill2.png
 | `title` | string | `Water Tank` | Card title |
 | `background_image` | string | `/local/TANK/water_tank_background_clean.png` | Path to tank background image |
 | `fill_image` | string | `/local/TANK/water_fill2.png` | Path to water fill image |
+
+[![Buy Me A Coffee](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/hybridrcg)
 
 ## License
 
