@@ -1,4 +1,4 @@
-const CARD_VERSION = '2.4.0';
+const CARD_VERSION = '2.5.0';
 
 class WaterTankCard extends HTMLElement {
   constructor() {
@@ -198,78 +198,42 @@ class WaterTankCard extends HTMLElement {
         }
         .card-wrap {
           padding: 12px 12px 8px;
-          cursor: pointer; user-select: none; -webkit-user-select: none;
+          user-select: none; -webkit-user-select: none;
           touch-action: manipulation;
         }
         .tank-svg { display: block; width: 100%; max-width: 320px; margin: 0 auto; }
         @keyframes wv { 0%{transform:translateX(0)} 100%{transform:translateX(-120px)} }
         .wl { animation: wv 4s linear infinite; }
-        ${pumpOn ? `.pump-icon { animation: pp 0.8s infinite; } @keyframes pp { 0%,100%{opacity:1}50%{opacity:0.4} }` : ''}
-        .stats-bar { display: flex; margin: 10px 0 0; gap: 8px; }
-        .stat-box {
-          flex: 1; background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 10px; padding: 10px 8px; text-align: center;
-        }
-        .stat-label {
-          font-size: 10px; font-weight: 600; letter-spacing: 1.2px;
-          color: var(--secondary-text-color, #888); text-transform: uppercase;
-        }
-        .stat-val {
-          font-size: 22px; font-weight: 700; margin-top: 2px;
-          color: var(--primary-text-color, #fff);
-        }
-        .pump-status {
-          display: flex; align-items: center; justify-content: center;
-          gap: 8px; margin-top: 8px; padding: 8px 12px;
-          background: ${pumpOn ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'};
-          border: 1px solid ${pumpOn ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.08)'};
-          border-radius: 10px;
-          cursor: pointer;
-          transition: background 0.3s;
-        }
-        .pump-status:hover { background: ${pumpOn ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.08)'}; }
-        .pump-label { font-size: 13px; font-weight: 600; color: ${pumpOn ? '#ef4444' : 'rgba(255,255,255,0.5)'}; }
-        .pump-dot {
-          width: 8px; height: 8px; border-radius: 50%;
-          background: ${pumpOn ? '#ef4444' : 'rgba(255,255,255,0.2)'};
-          ${pumpOn ? 'animation: dotPulse 1s infinite;' : ''}
-        }
-        @keyframes dotPulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        ${pumpOn ? `.pump-icon { animation: pp 0.8s infinite; } @keyframes pp { 0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(1.1)} }` : ''}
+        .pump-icon { cursor: pointer; }
+        .pump-icon:hover { filter: brightness(1.3) ${pumpGlow}; }
       </style>
 
       <ha-card>
         <div class="card-wrap">
           <svg class="tank-svg" viewBox="0 0 300 380" xmlns="http://www.w3.org/2000/svg">
             ${tankSvgInner}
-            ${pe ? `<g class="pump-icon" transform="translate(${150-15}, ${pumpY-15}) scale(1.25)" style="filter:${pumpGlow}">${pumpSvg}</g>` : ''}
+            ${pe ? `<g class="pump-icon" id="pumpIcon" transform="translate(${150-15}, ${pumpY-15}) scale(1.25)" style="filter:${pumpGlow};cursor:pointer">${pumpSvg}</g>` : ''}
             <text x="150" y="235" text-anchor="middle" dominant-baseline="central" font-size="52" font-weight="800" fill="#fff" filter="url(#ts)">${p}%</text>
           </svg>
-
-          <div class="stats-bar">
-            <div class="stat-box">
-              <div class="stat-label">Level</div>
-              <div class="stat-val">${p}%</div>
-            </div>
-            ${litersText ? `<div class="stat-box">
-              <div class="stat-label">Remaining</div>
-              <div class="stat-val">${litersText}</div>
-            </div>` : ''}
-          </div>
-
-          ${pe ? `<div class="pump-status" id="pumpBtn">
-            <svg viewBox="0 0 24 24" width="20" height="20">${pumpSvg}</svg>
-            <div class="pump-dot"></div>
-            <div class="pump-label">Pump ${pumpOn ? 'ON' : 'OFF'}</div>
-          </div>` : ''}
         </div>
       </ha-card>`;
 
-    this._bindEvents();
-    // Pump button in full mode
-    const pumpBtn = this.shadowRoot.querySelector('#pumpBtn');
-    if (pumpBtn) {
-      pumpBtn.addEventListener('click', (e) => {
+    // Hold to navigate on the card wrap
+    const wrap = this.shadowRoot.querySelector('.card-wrap');
+    if (wrap && !wrap._bound) {
+      wrap._bound = true;
+      wrap.addEventListener('pointerdown', () => {
+        this._isHold = false;
+        this._holdTimer = setTimeout(() => { this._isHold = true; this._handleHold(); }, 500);
+      });
+      wrap.addEventListener('pointerup', () => { clearTimeout(this._holdTimer); });
+      wrap.addEventListener('pointerleave', () => clearTimeout(this._holdTimer));
+    }
+    // Pump icon click in full mode
+    const pumpIcon = this.shadowRoot.querySelector('#pumpIcon');
+    if (pumpIcon) {
+      pumpIcon.addEventListener('click', (e) => {
         e.stopPropagation();
         this._handleTap();
       });
