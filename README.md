@@ -2,6 +2,8 @@
 
 A custom Home Assistant Lovelace card for displaying water tank levels with smooth animated fill effects.
 
+<img width="145" height="132" alt="Water Tank" src="https://github.com/user-attachments/assets/6d682f7d-7814-48b7-a4d6-9b2bc476cbc3" />
+
 ## Features
 
 - 🌊 Animated water fill from bottom up based on sensor value
