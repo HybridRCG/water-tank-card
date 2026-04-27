@@ -1,4 +1,4 @@
-const CARD_VERSION = '2.2.0';
+const CARD_VERSION = '2.3.0';
 
 class WaterTankCard extends HTMLElement {
   constructor() {
@@ -27,7 +27,7 @@ class WaterTankCard extends HTMLElement {
       columns: 3,
       rows: 2,
       min_columns: 2,
-      min_rows: 1,
+      min_rows: 2,
       max_columns: 12,
       max_rows: 8,
     };
@@ -106,7 +106,7 @@ class WaterTankCard extends HTMLElement {
       <style>
         :host { display: block; }
         ha-card {
-          height: 100%;
+          height: 110px;
           border-radius: 18px !important;
           background: rgba(30,30,30,0.35) !important;
           backdrop-filter: blur(10px);
@@ -132,10 +132,8 @@ class WaterTankCard extends HTMLElement {
         }
         .tank-svg {
           display: block;
-          flex: 1;
+          height: 72px;
           width: auto;
-          max-height: calc(100% - 26px);
-          min-height: 50px;
         }
         @keyframes wv { 0% { transform: translateX(0); } 100% { transform: translateX(-100px); } }
         .wl { animation: wv 4s linear infinite; }
