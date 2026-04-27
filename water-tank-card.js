@@ -1,4 +1,4 @@
-const CARD_VERSION = '2.0.0';
+const CARD_VERSION = '2.1.0';
 
 class WaterTankCard extends HTMLElement {
   constructor() {
@@ -74,27 +74,22 @@ class WaterTankCard extends HTMLElement {
     }
     const p = Math.round(pct);
 
-    // Pump
     const pe = c.pump_entity;
     const pump = pe ? this._hass.states[pe] : null;
     const pumpOn = pump && pump.state === 'on';
-    const pumpColor = pumpOn ? '#ef4444' : 'rgba(255,255,255,0.3)';
-    const pumpGlow = pumpOn ? 'drop-shadow(0 0 4px rgba(239,68,68,0.8))' : 'none';
+    const pumpColor = pumpOn ? '#ef4444' : 'rgba(255,255,255,0.35)';
 
-    // Tank geometry (same SVG tank from v1.8, viewBox 0 0 300 380)
-    const L = 70, R = 230, domeY = 60, topY = 80, botY = 340, cornerR = 15;
+    // Tank SVG geometry — compact viewBox for tight fit
+    const L = 60, R = 240, domeY = 50, topY = 72, botY = 330, cR = 14;
     const fillY = botY - (pct / 100) * (botY - topY);
+    const tankPath = `M ${L},${topY} Q ${L},${domeY-5} 150,${domeY-10} Q ${R},${domeY-5} ${R},${topY} L ${R},${botY-cR} Q ${R},${botY} ${R-cR},${botY} L ${L+cR},${botY} Q ${L},${botY} ${L},${botY-cR} Z`;
 
-    const tankPath = `M ${L},${topY} Q ${L},${domeY-5} 150,${domeY-10} Q ${R},${domeY-5} ${R},${topY} L ${R},${botY-cornerR} Q ${R},${botY} ${R-cornerR},${botY} L ${L+cornerR},${botY} Q ${L},${botY} ${L},${botY-cornerR} Z`;
-
-    const ribCount = 7, ribSp = (botY - topY) / (ribCount + 1);
+    const ribCount = 6, ribSp = (botY - topY) / (ribCount + 1);
     let ribs = '';
     for (let i = 1; i <= ribCount; i++) {
       const ry = topY + i * ribSp;
-      ribs += `<line x1="${L}" y1="${ry}" x2="${R}" y2="${ry}" stroke="rgba(255,255,255,0.25)" stroke-width="1.2"/>`;
+      ribs += `<line x1="${L}" y1="${ry}" x2="${R}" y2="${ry}" stroke="rgba(255,255,255,0.22)" stroke-width="1"/>`;
     }
-
-    const pumpY = Math.max(domeY + 15, fillY - 30);
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -106,41 +101,59 @@ class WaterTankCard extends HTMLElement {
           backdrop-filter: blur(10px);
           border: 1px solid rgba(255,255,255,0.08) !important;
           box-shadow: none !important;
-          overflow: hidden;
+          overflow: visible;
           padding: 0;
+          position: relative;
         }
         .card-touch {
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: center;
+          justify-content: flex-start;
           width: 100%;
           height: 100%;
           cursor: pointer;
           user-select: none;
           -webkit-user-select: none;
           touch-action: manipulation;
+          gap: 4px;
+          padding-top: 6px;
         }
         .tank-svg {
           display: block;
+          height: 72px;
           width: auto;
-          height: 78px;
-          margin-top: 2px;
         }
-        @keyframes wv { 0% { transform: translateX(0); } 100% { transform: translateX(-120px); } }
+        @keyframes wv { 0% { transform: translateX(0); } 100% { transform: translateX(-100px); } }
         .wl { animation: wv 4s linear infinite; }
-        ${pumpOn ? `.pump-icon { animation: pp 0.8s infinite; } @keyframes pp { 0%,100%{opacity:1}50%{opacity:0.4} }` : ''}
         .tank-label {
-          font-size: 14px;
+          font-size: 18px;
           font-weight: 600;
           color: rgba(255,255,255,0.9);
           line-height: 1;
-          margin-top: 1px;
+          margin-top: -2px;
         }
+        /* Pump badge - top right corner of the card */
+        .pump-badge {
+          position: absolute;
+          top: 6px;
+          right: 8px;
+          width: 22px;
+          height: 22px;
+          z-index: 10;
+        }
+        .pump-badge svg { width: 100%; height: 100%; }
+        ${pumpOn ? `.pump-badge { animation: pp 0.8s infinite; } @keyframes pp { 0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.15)} }` : ''}
       </style>
+
       <ha-card>
+        ${pe ? `<div class="pump-badge">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19,14.5C19,14.5 21,16.67 21,18A2,2 0 0,1 19,20A2,2 0 0,1 17,18C17,16.67 19,14.5 19,14.5M5,18V9A2,2 0 0,1 3,7A2,2 0 0,1 5,5V4A2,2 0 0,1 7,2H9A2,2 0 0,1 11,4V5H19A2,2 0 0,1 21,7V9L21,11A1,1 0 0,1 22,12A1,1 0 0,1 21,13H17A1,1 0 0,1 16,12A1,1 0 0,1 17,11V9H11V18H12A2,2 0 0,1 14,20V22H2V20A2,2 0 0,1 4,18H5Z" fill="${pumpColor}"/>
+          </svg>
+        </div>` : ''}
         <div class="card-touch">
-          <svg class="tank-svg" viewBox="0 0 300 380" xmlns="http://www.w3.org/2000/svg">
+          <svg class="tank-svg" viewBox="20 10 260 340" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="fg" x1="0" y1="1" x2="0" y2="0">
                 <stop offset="0%" stop-color="#d32f2f"/>
@@ -152,20 +165,17 @@ class WaterTankCard extends HTMLElement {
                 <stop offset="100%" stop-color="#43a047"/>
               </linearGradient>
               <clipPath id="tc"><path d="${tankPath}"/></clipPath>
-              <filter id="ts"><feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="rgba(0,0,0,0.7)"/></filter>
+              <filter id="ts"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="rgba(0,0,0,0.7)"/></filter>
             </defs>
             <g clip-path="url(#tc)">
               <rect x="${L}" y="${fillY}" width="${R-L}" height="${botY-fillY}" fill="url(#fg)" opacity="0.9"/>
-              ${pct > 2 ? `<g class="wl"><path d="M ${L-10},${fillY} q 15,-7 30,0 t 30,0 t 30,0 t 30,0 t 30,0 t 30,0 t 30,0 L ${R+10},${fillY+12} L ${L-10},${fillY+12} Z" fill="rgba(255,255,255,0.15)"/></g>` : ''}
+              ${pct > 2 ? `<g class="wl"><path d="M ${L-10},${fillY} q 12,-6 24,0 t 24,0 t 24,0 t 24,0 t 24,0 t 24,0 t 24,0 t 24,0 t 24,0 L ${R+10},${fillY+10} L ${L-10},${fillY+10} Z" fill="rgba(255,255,255,0.15)"/></g>` : ''}
             </g>
-            <path d="${tankPath}" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2.5"/>
+            <path d="${tankPath}" fill="none" stroke="rgba(255,255,255,0.65)" stroke-width="2.5"/>
             ${ribs}
-            <path d="M 130,${domeY-10} L 130,${domeY-22} Q 130,${domeY-26} 134,${domeY-26} L 166,${domeY-26} Q 170,${domeY-26} 170,${domeY-22} L 170,${domeY-10}" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
-            <rect x="140" y="${domeY-32}" width="20" height="7" rx="3" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="1.5"/>
-            ${pe ? `<g class="pump-icon" transform="translate(${150-15}, ${pumpY-15}) scale(1.25)" style="filter:${pumpGlow}">
-              <path d="M19,14.5C19,14.5 21,16.67 21,18A2,2 0 0,1 19,20A2,2 0 0,1 17,18C17,16.67 19,14.5 19,14.5M5,18V9A2,2 0 0,1 3,7A2,2 0 0,1 5,5V4A2,2 0 0,1 7,2H9A2,2 0 0,1 11,4V5H19A2,2 0 0,1 21,7V9L21,11A1,1 0 0,1 22,12A1,1 0 0,1 21,13H17A1,1 0 0,1 16,12A1,1 0 0,1 17,11V9H11V18H12A2,2 0 0,1 14,20V22H2V20A2,2 0 0,1 4,18H5Z" fill="${pumpColor}"/>
-            </g>` : ''}
-            <text x="150" y="230" text-anchor="middle" dominant-baseline="central" font-size="52" font-weight="800" fill="#fff" filter="url(#ts)">${p}%</text>
+            <path d="M 130,${domeY-10} L 130,${domeY-20} Q 130,${domeY-24} 134,${domeY-24} L 166,${domeY-24} Q 170,${domeY-24} 170,${domeY-20} L 170,${domeY-10}" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.8"/>
+            <rect x="141" y="${domeY-29}" width="18" height="6" rx="2" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.3"/>
+            <text x="150" y="210" text-anchor="middle" dominant-baseline="central" font-size="48" font-weight="800" fill="#fff" filter="url(#ts)">${p}%</text>
           </svg>
           <div class="tank-label">${title}</div>
         </div>
@@ -176,5 +186,5 @@ class WaterTankCard extends HTMLElement {
 
 customElements.define('water-tank-card', WaterTankCard);
 window.customCards = window.customCards || [];
-window.customCards.push({ type: 'water-tank-card', name: 'Water Tank Card', description: 'SVG water tank with pump control', preview: true, documentationURL: 'https://github.com/HybridRCG/water-tank-card' });
+window.customCards.push({ type: 'water-tank-card', name: 'Water Tank Card', description: 'Compact SVG water tank with pump control', preview: true, documentationURL: 'https://github.com/HybridRCG/water-tank-card' });
 console.info('%c WATER-TANK-CARD %c v' + CARD_VERSION, 'color:#fff;background:#2e7d32;padding:2px 6px;border-radius:3px 0 0 3px;font-weight:bold;', 'color:#2e7d32;background:#e8f5e9;padding:2px 6px;border-radius:0 3px 3px 0;');
