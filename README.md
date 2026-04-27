@@ -73,6 +73,9 @@ fill_image: /local/TANK/water_fill2.png
 
 [![Buy Me A Coffee](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/hybridrcg)
 
+<img width="167" height="289" alt="Water Tank Full" src="https://github.com/user-attachments/assets/45c38470-89ce-4976-abed-2b2432c42607" />
+
+
 ## License
 
 MIT License - Feel free to use and modify
