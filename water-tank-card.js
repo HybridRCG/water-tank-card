@@ -1,25 +1,40 @@
-const CARD_VERSION = '2.8.0';
+const CARD_VERSION = '2.9.0';
 
 // ══════════════════════════════════════════════════════════
-//  PHASE 3 — Visual Config Editor
+//  EDITOR  — renders once, updates values in-place on change
+//  Never rebuilds the DOM on hass updates (no slowdown)
 // ══════════════════════════════════════════════════════════
 class WaterTankCardEditor extends HTMLElement {
   constructor() {
     super();
     this._config = {};
     this._hass = null;
+    this._rendered = false;
     this.attachShadow({ mode: 'open' });
   }
 
-  set hass(hass) { this._hass = hass; }
+  set hass(hass) {
+    this._hass = hass;
+    // First time we get hass, build the DOM if not yet done
+    if (!this._rendered) {
+      this._rendered = true;
+      this._render();
+    }
+    // Do NOT re-render on every hass update — only populate entity lists once
+  }
 
   setConfig(config) {
     this._config = { ...config };
-    this._render();
+    if (this._rendered) {
+      this._updateValues();
+    }
+    // If not rendered yet, _render() triggered by hass setter will pick up _config
   }
 
   _dispatch() {
-    this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: this._config }, bubbles: true, composed: true }));
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      detail: { config: this._config }, bubbles: true, composed: true
+    }));
   }
 
   _entities() {
@@ -29,9 +44,29 @@ class WaterTankCardEditor extends HTMLElement {
 
   _entitySelect(field, current) {
     const opts = ['<option value="">— none —</option>',
-      ...this._entities().map(e => `<option value="${e}"${e === current ? ' selected' : ''}>${e}</option>`)
+      ...this._entities().map(e =>
+        `<option value="${e}"${e === current ? ' selected' : ''}>${e}</option>`)
     ].join('');
     return `<select data-field="${field}">${opts}</select>`;
+  }
+
+  // Update existing input/select values without touching the DOM structure
+  _updateValues() {
+    const c = this._config;
+    const set = (field, val) => {
+      const el = this.shadowRoot.querySelector(`[data-field="${field}"]`);
+      if (el && document.activeElement !== el) el.value = val || '';
+    };
+    set('entity_level', c.entity_level);
+    set('title', c.title);
+    set('mode', c.mode || 'compact');
+    set('tank_capacity', c.tank_capacity || '');
+    set('tank_color', c.tank_color || c.fill_color || '#1a78c2');
+    set('pump_entity', c.pump_entity);
+    set('pump_confirmation', c.pump_confirmation);
+    set('history_entity', c.history_entity);
+    set('navigate_to', c.navigate_to);
+    set('tap_action', c.tap_action || 'pump');
   }
 
   _render() {
@@ -42,17 +77,24 @@ class WaterTankCardEditor extends HTMLElement {
         .editor { display: flex; flex-direction: column; gap: 12px; padding: 4px 0; }
         label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--primary-text-color); }
         input, select {
-          padding: 6px 8px; border-radius: 6px; border: 1px solid var(--divider-color, #ccc);
-          background: var(--card-background-color, #fff); color: var(--primary-text-color);
+          padding: 6px 8px; border-radius: 6px;
+          border: 1px solid var(--divider-color, #ccc);
+          background: var(--card-background-color, #fff);
+          color: var(--primary-text-color);
           font-size: 13px; width: 100%; box-sizing: border-box;
         }
         .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .section { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
-          color: var(--secondary-text-color); margin-top: 4px; border-bottom: 1px solid var(--divider-color,#eee); padding-bottom: 3px; }
+        .section {
+          font-size: 11px; font-weight: 700; text-transform: uppercase;
+          letter-spacing: 0.08em; color: var(--secondary-text-color);
+          margin-top: 4px; border-bottom: 1px solid var(--divider-color, #eee);
+          padding-bottom: 3px;
+        }
         input[type=color] { height: 34px; padding: 2px 4px; cursor: pointer; }
         .hint { font-size: 11px; color: var(--secondary-text-color); margin-top: -6px; }
       </style>
       <div class="editor">
+
         <div class="section">Required</div>
         <label>Tank Level Entity (%)
           ${this._entitySelect('entity_level', c.entity_level)}
@@ -75,41 +117,47 @@ class WaterTankCardEditor extends HTMLElement {
         <label>Tank Capacity (litres)
           <input type="number" data-field="tank_capacity" value="${c.tank_capacity || ''}" placeholder="e.g. 5000">
         </label>
-        <p class="hint">Shows calculated litres beneath the %. Leave blank to hide.</p>
+        <p class="hint">Shows calculated litres beneath %. Leave blank to hide.</p>
 
-        <div class="section">Colour</div>
-        <label>Custom Fill Colour (overrides red→green gradient)
+        <div class="section">Fill Colour</div>
+        <label>Custom colour (removes red→green gradient)
           <input type="color" data-field="tank_color" value="${c.tank_color || c.fill_color || '#1a78c2'}">
         </label>
+        <p class="hint">Delete tank_color from YAML to restore the default gradient.</p>
 
         <div class="section">Pump</div>
         <label>Pump Entity
           ${this._entitySelect('pump_entity', c.pump_entity)}
         </label>
         <label>Pump Confirmation Message
-          <input type="text" data-field="pump_confirmation" value="${c.pump_confirmation || ''}" placeholder="Are you sure you want to Toggle the Borehole Pump?">
+          <input type="text" data-field="pump_confirmation"
+            value="${c.pump_confirmation || ''}"
+            placeholder="Are you sure you want to Toggle the Borehole Pump?">
         </label>
 
-        <div class="section">History Sparkline (Full mode)</div>
-        <label>History Entity (defaults to Level entity)
-          ${this._entitySelect('history_entity', c.history_entity)}
-        </label>
-
-        <div class="section">Navigation</div>
-        <label>Hold to Navigate (path)
-          <input type="text" data-field="navigate_to" value="${c.navigate_to || ''}" placeholder="/lovelace/tanks">
-        </label>
-
-        <div class="section">More Info</div>
-        <label>Tap action
+        <div class="section">Tap Action</div>
+        <label>What happens when you tap the card
           <select data-field="tap_action">
             <option value="pump"${(!c.tap_action || c.tap_action === 'pump') ? ' selected' : ''}>Toggle pump</option>
             <option value="more-info"${c.tap_action === 'more-info' ? ' selected' : ''}>More info (level entity)</option>
             <option value="none"${c.tap_action === 'none' ? ' selected' : ''}>None</option>
           </select>
         </label>
+
+        <div class="section">Navigation</div>
+        <label>Hold to Navigate (Lovelace path)
+          <input type="text" data-field="navigate_to"
+            value="${c.navigate_to || ''}" placeholder="/lovelace/tanks">
+        </label>
+
+        <div class="section">History Sparkline (Full mode)</div>
+        <label>History Entity (defaults to level entity)
+          ${this._entitySelect('history_entity', c.history_entity)}
+        </label>
+
       </div>`;
 
+    // Attach listeners once — no re-attachment on subsequent renders
     this.shadowRoot.querySelectorAll('[data-field]').forEach(el => {
       const ev = el.type === 'color' ? 'input' : 'change';
       el.addEventListener(ev, (e) => {
@@ -120,7 +168,10 @@ class WaterTankCardEditor extends HTMLElement {
           delete updated[field];
           this._config = updated;
         } else {
-          this._config = { ...this._config, [field]: field === 'tank_capacity' ? parseFloat(val) : val };
+          this._config = {
+            ...this._config,
+            [field]: field === 'tank_capacity' ? parseFloat(val) : val
+          };
         }
         this._dispatch();
       });
@@ -141,6 +192,9 @@ class WaterTankCard extends HTMLElement {
     this._holdTimer = null;
     this._isHold = false;
     this._history = [];
+    this._lastPct = null;
+    this._lastPumpOn = null;
+    this._lastMode = null;
     this.attachShadow({ mode: 'open' });
   }
 
@@ -155,13 +209,34 @@ class WaterTankCard extends HTMLElement {
   setConfig(config) {
     if (!config.entity_level) throw new Error('Please define entity_level');
     this._config = config;
+    // Config changed — force a fresh render
+    this._lastPct = null;
+    this._lastPumpOn = null;
+    this._lastMode = null;
   }
 
   set hass(hass) {
     this._hass = hass;
+    if (!this._config) return;
+
+    // Dirty check — skip full re-render if nothing visible changed
+    const level = hass.states[this._config.entity_level];
+    const pctRaw = level && level.state !== 'unknown' && level.state !== 'unavailable'
+      ? Math.round(parseFloat(String(level.state).match(/[\d.]+/)?.[0]) || 0)
+      : 0;
+    const pe = this._config.pump_entity;
+    const pumpOn = pe ? (hass.states[pe] && hass.states[pe].state === 'on') : false;
+    const mode = this._config.mode || 'compact';
+
+    if (pctRaw === this._lastPct && pumpOn === this._lastPumpOn && mode === this._lastMode) return;
+
+    this._lastPct = pctRaw;
+    this._lastPumpOn = pumpOn;
+    this._lastMode = mode;
     this._render();
-    // Phase 4: fetch history for sparkline (full mode only, throttled)
-    if (this._config && this._config.mode === 'full') {
+
+    // History: fetch once per minute in full mode
+    if (mode === 'full') {
       const now = Date.now();
       if (!this._lastHistoryFetch || now - this._lastHistoryFetch > 60000) {
         this._lastHistoryFetch = now;
@@ -178,7 +253,6 @@ class WaterTankCard extends HTMLElement {
     return { columns: 3, rows: 2, min_columns: 2, min_rows: 2, max_columns: 6, max_rows: 4 };
   }
 
-  // ── Phase 4: history fetch ───────────────────────────────
   async _fetchHistory() {
     if (!this._hass || !this._config) return;
     const entityId = this._config.history_entity || this._config.entity_level;
@@ -199,7 +273,6 @@ class WaterTankCard extends HTMLElement {
     } catch (_) { /* history unavailable — silently skip */ }
   }
 
-  // ── Phase 4: sparkline SVG ───────────────────────────────
   _sparklineSvg(history, width = 260, height = 36) {
     if (!history || history.length < 2) return '';
     const vals = history.map(h => h.v);
@@ -212,30 +285,30 @@ class WaterTankCard extends HTMLElement {
     const pts = history.map(h => `${px(h.t).toFixed(1)},${py(h.v).toFixed(1)}`).join(' ');
     const areaClose = ` ${width},${height} 0,${height}`;
     return `
-      <svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:${height}px;display:block;opacity:0.7;margin-top:4px">
+      <svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg"
+           style="width:100%;height:${height}px;display:block;opacity:0.7;margin-top:4px">
         <defs>
           <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#42a5f5" stop-opacity="0.4"/>
+            <stop offset="0%"   stop-color="#42a5f5" stop-opacity="0.4"/>
             <stop offset="100%" stop-color="#42a5f5" stop-opacity="0"/>
           </linearGradient>
         </defs>
         <polygon points="${pts} ${areaClose}" fill="url(#sg)"/>
-        <polyline points="${pts}" fill="none" stroke="#42a5f5" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <polyline points="${pts}" fill="none" stroke="#42a5f5" stroke-width="1.5"
+                  stroke-linejoin="round" stroke-linecap="round"/>
       </svg>`;
   }
 
-  // ── Phase 4: more-info dialog ────────────────────────────
   _fireMoreInfo(entityId) {
-    this.dispatchEvent(new CustomEvent('hass-more-info', { bubbles: true, composed: true, detail: { entityId } }));
+    this.dispatchEvent(new CustomEvent('hass-more-info',
+      { bubbles: true, composed: true, detail: { entityId } }));
   }
 
-  // ── Phase 2: fill colour ─────────────────────────────────
   _fillStyle(pct, customColor) {
     if (customColor) return { fill: customColor, glow: customColor };
     return { fill: 'url(#fg)', glow: pct > 60 ? '#43a047' : pct > 30 ? '#fbc02d' : '#e53935' };
   }
 
-  // ── Phase 2: litres display ──────────────────────────────
   _litresText(pct, config, hass) {
     if (config.entity_liters) {
       const lit = hass.states[config.entity_liters];
@@ -257,25 +330,17 @@ class WaterTankCard extends HTMLElement {
   _handleTap() {
     if (!this._hass || !this._config) return;
     const action = this._config.tap_action || (this._config.pump_entity ? 'pump' : 'none');
-    if (action === 'more-info') {
-      this._fireMoreInfo(this._config.entity_level);
-      return;
-    }
+    if (action === 'more-info') { this._fireMoreInfo(this._config.entity_level); return; }
     if (action === 'pump' && this._config.pump_entity) {
       const msg = this._config.pump_confirmation || 'Are you sure you want to Toggle the Borehole Pump?';
-      if (confirm(msg)) {
-        this._hass.callService('switch', 'toggle', { entity_id: this._config.pump_entity });
-      }
+      if (confirm(msg)) this._hass.callService('switch', 'toggle', { entity_id: this._config.pump_entity });
     }
   }
 
   _handleHold() {
     if (!this._config) return;
     const nav = this._config.navigate_to || '';
-    if (nav) {
-      window.history.pushState(null, '', nav);
-      window.dispatchEvent(new Event('location-changed'));
-    }
+    if (nav) { window.history.pushState(null, '', nav); window.dispatchEvent(new Event('location-changed')); }
   }
 
   _bindEvents() {
@@ -286,10 +351,7 @@ class WaterTankCard extends HTMLElement {
       this._isHold = false;
       this._holdTimer = setTimeout(() => { this._isHold = true; this._handleHold(); }, 500);
     });
-    el.addEventListener('pointerup', () => {
-      clearTimeout(this._holdTimer);
-      if (!this._isHold) this._handleTap();
-    });
+    el.addEventListener('pointerup', () => { clearTimeout(this._holdTimer); if (!this._isHold) this._handleTap(); });
     el.addEventListener('pointerleave', () => clearTimeout(this._holdTimer));
   }
 
@@ -322,7 +384,6 @@ class WaterTankCard extends HTMLElement {
     const pumpColor = pumpOn ? '#ef4444' : 'rgba(255,255,255,0.3)';
     const pumpGlow = pumpOn ? 'drop-shadow(0 0 4px rgba(239,68,68,0.8))' : 'none';
 
-    // Geometry
     const L = 60, R = 240, domeY = 50, topY = 72, botY = 330, cR = 14;
     const fillY = botY - (pct / 100) * (botY - topY);
     const tankPath = `M ${L},${topY} Q ${L},${domeY-5} 150,${domeY-10} Q ${R},${domeY-5} ${R},${topY} L ${R},${botY-cR} Q ${R},${botY} ${R-cR},${botY} L ${L+cR},${botY} Q ${L},${botY} ${L},${botY-cR} Z`;
@@ -466,5 +527,15 @@ class WaterTankCard extends HTMLElement {
 
 customElements.define('water-tank-card', WaterTankCard);
 window.customCards = window.customCards || [];
-window.customCards.push({ type: 'water-tank-card', name: 'Water Tank Card', description: 'Animated SVG water tank — compact & full modes', preview: true, documentationURL: 'https://github.com/HybridRCG/water-tank-card' });
-console.info('%c WATER-TANK-CARD %c v' + CARD_VERSION, 'color:#fff;background:#1565c0;padding:2px 6px;border-radius:3px 0 0 3px;font-weight:bold;', 'color:#1565c0;background:#e3f2fd;padding:2px 6px;border-radius:0 3px 3px 0;');
+window.customCards.push({
+  type: 'water-tank-card',
+  name: 'Water Tank Card',
+  description: 'Animated SVG water tank — compact & full modes',
+  preview: true,
+  documentationURL: 'https://github.com/HybridRCG/water-tank-card'
+});
+console.info(
+  '%c WATER-TANK-CARD %c v' + CARD_VERSION,
+  'color:#fff;background:#1565c0;padding:2px 6px;border-radius:3px 0 0 3px;font-weight:bold;',
+  'color:#1565c0;background:#e3f2fd;padding:2px 6px;border-radius:0 3px 3px 0;'
+);
