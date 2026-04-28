@@ -1,6 +1,6 @@
 {
   "name": "water-tank-card",
-  "version": "2.6.0",
+  "version": "2.8.0",
   "description": "Custom Home Assistant Lovelace card for animated water tank level display",
   "main": "water-tank-card.js",
   "repository": {
