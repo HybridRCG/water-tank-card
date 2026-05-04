@@ -1,4 +1,4 @@
-const CARD_VERSION = '2.9.0';
+const CARD_VERSION = '3.0.0';
 
 // ══════════════════════════════════════════════════════════
 //  EDITOR  — renders once, updates values in-place on change
@@ -463,10 +463,8 @@ class WaterTankCard extends HTMLElement {
           <div class="card-touch">
             <svg class="tank-svg" viewBox="20 10 260 340" xmlns="http://www.w3.org/2000/svg">
               ${tankSvgInner}
-              <text x="150" y="210" text-anchor="middle" dominant-baseline="central" font-size="48" font-weight="800" fill="#fff" filter="url(#ts)">${p}%</text>
             </svg>
-            <div class="tank-label">${title}</div>
-            ${litresText ? `<div class="litres-label">${litresText}</div>` : ''}
+            <div class="tank-label">${title} — ${p}%</div>
           </div>
         </ha-card>`;
       this._bindEvents();
