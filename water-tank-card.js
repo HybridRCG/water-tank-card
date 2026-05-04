@@ -1,4 +1,4 @@
-const CARD_VERSION = '3.0.0';
+const CARD_VERSION = '3.1.0';
 
 // ══════════════════════════════════════════════════════════
 //  EDITOR  — renders once, updates values in-place on change
@@ -445,11 +445,11 @@ class WaterTankCard extends HTMLElement {
           }
           .card-touch {
             display: flex; flex-direction: column; align-items: center;
-            justify-content: flex-start; width: 100%; height: 100%;
+            justify-content: center; width: 100%; height: 100%;
             cursor: pointer; user-select: none; -webkit-user-select: none;
-            touch-action: manipulation; gap: 2px; padding-top: 5px;
+            touch-action: manipulation; gap: 3px;
           }
-          .tank-svg { display: block; height: 68px; width: auto; }
+          .tank-svg { display: block; height: 74px; width: auto; }
           @keyframes wv { 0%{transform:translateX(0)} 100%{transform:translateX(-100px)} }
           .wl { animation: wv 4s linear infinite; }
           .tank-label { font-size: 17px; font-weight: 600; color: var(--primary-text-color, rgba(255,255,255,0.9)); line-height:1; }
