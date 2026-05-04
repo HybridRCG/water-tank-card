@@ -1,4 +1,4 @@
-const CARD_VERSION = '3.1.0';
+const CARD_VERSION = '3.2.0';
 
 // ══════════════════════════════════════════════════════════
 //  EDITOR  — renders once, updates values in-place on change
@@ -15,12 +15,13 @@ class WaterTankCardEditor extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
-    // First time we get hass, build the DOM if not yet done
     if (!this._rendered) {
       this._rendered = true;
       this._render();
+    } else {
+      // Push hass to existing pickers only — zero DOM rebuild
+      this.shadowRoot.querySelectorAll('ha-entity-picker[data-picker]').forEach(p => { p.hass = hass; });
     }
-    // Do NOT re-render on every hass update — only populate entity lists once
   }
 
   setConfig(config) {
@@ -37,17 +38,9 @@ class WaterTankCardEditor extends HTMLElement {
     }));
   }
 
-  _entities() {
-    if (!this._hass) return [];
-    return Object.keys(this._hass.states).sort();
-  }
-
-  _entitySelect(field, current) {
-    const opts = ['<option value="">— none —</option>',
-      ...this._entities().map(e =>
-        `<option value="${e}"${e === current ? ' selected' : ''}>${e}</option>`)
-    ].join('');
-    return `<select data-field="${field}">${opts}</select>`;
+  _entityPicker(field, current) {
+    // ha-entity-picker is HA's native lazy searchable picker — no entity list in DOM
+    return `<ha-entity-picker data-field="${field}" data-picker="true" allow-custom-entity></ha-entity-picker>`;
   }
 
   // Update existing input/select values without touching the DOM structure
@@ -97,7 +90,7 @@ class WaterTankCardEditor extends HTMLElement {
 
         <div class="section">Required</div>
         <label>Tank Level Entity (%)
-          ${this._entitySelect('entity_level', c.entity_level)}
+          ${this._entityPicker('entity_level', c.entity_level)}
         </label>
 
         <div class="section">Display</div>
@@ -127,7 +120,7 @@ class WaterTankCardEditor extends HTMLElement {
 
         <div class="section">Pump</div>
         <label>Pump Entity
-          ${this._entitySelect('pump_entity', c.pump_entity)}
+          ${this._entityPicker('pump_entity', c.pump_entity)}
         </label>
         <label>Pump Confirmation Message
           <input type="text" data-field="pump_confirmation"
@@ -152,26 +145,37 @@ class WaterTankCardEditor extends HTMLElement {
 
         <div class="section">History Sparkline (Full mode)</div>
         <label>History Entity (defaults to level entity)
-          ${this._entitySelect('history_entity', c.history_entity)}
+          ${this._entityPicker('history_entity', c.history_entity)}
         </label>
 
       </div>`;
 
-    // Attach listeners once — no re-attachment on subsequent renders
-    this.shadowRoot.querySelectorAll('[data-field]').forEach(el => {
+    // Wire plain inputs/selects
+    this.shadowRoot.querySelectorAll('[data-field]:not([data-picker])').forEach(el => {
       const ev = el.type === 'color' ? 'input' : 'change';
       el.addEventListener(ev, (e) => {
         const field = e.target.dataset.field;
         const val = e.target.value;
         if (val === '') {
-          const updated = { ...this._config };
-          delete updated[field];
-          this._config = updated;
+          const c2 = { ...this._config }; delete c2[field]; this._config = c2;
         } else {
-          this._config = {
-            ...this._config,
-            [field]: field === 'tank_capacity' ? parseFloat(val) : val
-          };
+          this._config = { ...this._config, [field]: field === 'tank_capacity' ? parseFloat(val) : val };
+        }
+        this._dispatch();
+      });
+    });
+
+    // Wire ha-entity-picker elements — set hass + value, listen for value-changed
+    this.shadowRoot.querySelectorAll('ha-entity-picker[data-picker]').forEach(picker => {
+      const field = picker.dataset.field;
+      if (this._hass) picker.hass = this._hass;
+      picker.value = this._config[field] || '';
+      picker.addEventListener('value-changed', (e) => {
+        const val = e.detail.value;
+        if (!val) {
+          const c2 = { ...this._config }; delete c2[field]; this._config = c2;
+        } else {
+          this._config = { ...this._config, [field]: val };
         }
         this._dispatch();
       });
@@ -445,14 +449,14 @@ class WaterTankCard extends HTMLElement {
           }
           .card-touch {
             display: flex; flex-direction: column; align-items: center;
-            justify-content: center; width: 100%; height: 100%;
+            justify-content: center; align-items: center; width: 100%; height: 100%;
             cursor: pointer; user-select: none; -webkit-user-select: none;
-            touch-action: manipulation; gap: 3px;
+            touch-action: manipulation; gap: 3px; padding-bottom: 4px;
           }
           .tank-svg { display: block; height: 74px; width: auto; }
           @keyframes wv { 0%{transform:translateX(0)} 100%{transform:translateX(-100px)} }
           .wl { animation: wv 4s linear infinite; }
-          .tank-label { font-size: 17px; font-weight: 600; color: var(--primary-text-color, rgba(255,255,255,0.9)); line-height:1; }
+          .tank-label { font-size: 17px; font-weight: 600; color: ${p < 50 ? 'var(--error-color, #ef4444)' : 'var(--primary-text-color, rgba(255,255,255,0.9))'}; line-height:1; }
           .litres-label { font-size: 11px; color: var(--secondary-text-color, rgba(255,255,255,0.55)); line-height:1; }
           .pump-badge { position:absolute; top:6px; right:8px; width:20px; height:20px; z-index:10; }
           .pump-badge svg { width:100%; height:100%; }
