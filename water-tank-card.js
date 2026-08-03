@@ -1,4 +1,4 @@
-const CARD_VERSION = '4.0.0';
+const CARD_VERSION = '4.1.0';
 
 // ══════════════════════════════════════════════════════════
 //  EDITOR
@@ -293,10 +293,22 @@ class WaterTankCard extends HTMLElement {
     if (!entityId || !this._hass) return '—';
     const s = this._hass.states[entityId];
     if (!s || s.state === 'unknown' || s.state === 'unavailable') return '—';
-    const total = Math.round(parseFloat(s.state));
-    if (isNaN(total)) return s.state;
-    if (total < 60) return `${total} min`;
-    const h = Math.floor(total / 60), m = total % 60;
+    const val = parseFloat(s.state);
+    if (isNaN(val)) return s.state;
+    const unit = (s.attributes?.unit_of_measurement || '').toLowerCase();
+    let totalMins;
+    if (unit === 'h' || unit === 'hr' || unit === 'hours') {
+      totalMins = Math.round(val * 60);
+    } else if (unit === 's' || unit === 'sec' || unit === 'seconds') {
+      totalMins = Math.round(val / 60);
+    } else if (val !== Math.floor(val) && val < 24 && unit !== 'min' && unit !== 'minutes') {
+      // decimal with no unit and < 24 — treat as decimal hours (e.g. 2.45 = 2h27m)
+      totalMins = Math.round(val * 60);
+    } else {
+      totalMins = Math.round(val);
+    }
+    if (totalMins < 60) return `${totalMins} min`;
+    const h = Math.floor(totalMins / 60), m = totalMins % 60;
     return m > 0 ? `${h}h ${m}min` : `${h}h`;
   }
 
