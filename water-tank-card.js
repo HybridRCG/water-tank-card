@@ -1,4 +1,4 @@
-const CARD_VERSION = '3.8.0';
+const CARD_VERSION = '3.9.0';
 
 // ══════════════════════════════════════════════════════════
 //  EDITOR
@@ -99,6 +99,10 @@ class WaterTankCardEditor extends HTMLElement {
         <label><span>Daily kWh Entity</span>${this._picker('entity_daily_kwh')}</label>
         <label><span>Monthly kWh Entity</span>${this._picker('entity_monthly_kwh')}</label>
 
+        <div class="sec">Toggles Panel (Full mode — right column)</div>
+        <label><span>Toggles YAML (paste entity list)</span>
+          <textarea data-field="toggles_yaml" rows="5" style="font-size:11px;font-family:monospace;padding:6px;border-radius:6px;border:1px solid var(--divider-color,#ccc);background:var(--card-background-color,#fff);color:var(--primary-text-color);width:100%;box-sizing:border-box;resize:vertical">${c.toggles ? c.toggles.map(t=>typeof t==='string'?'- entity: '+t:'- entity: '+t.entity+(t.name?'\n  name: '+t.name:'')+(t.icon?'\n  icon: '+t.icon:'')).join('\n') : ''}</textarea>
+        </label>
         <div class="sec">History Sparkline</div>
         <label><span>History Entity</span>${this._picker('history_entity')}</label>
       </div>`;
@@ -414,73 +418,128 @@ class WaterTankCard extends HTMLElement {
     const updatedText = this._updatedText();
     const runtimeText = pumpOn ? this._runtimeText() : '';
 
-    // Stats panel rows
-    const row = (icon, label, val, unit='', cls='') =>
-      `<div class="stat-row ${cls}"><span class="stat-icon">${icon}</span><span class="stat-label">${label}</span><span class="stat-val">${val}${unit?' <small>'+unit+'</small>':''}</span></div>`;
+    // Stats rows
+    const row = (icon, label, val, unit='') =>
+      `<div class="stat-row"><span class="stat-icon">${icon}</span><span class="stat-label">${label}</span><span class="stat-val">${val}${unit?' <small>'+unit+'</small>':''}</span></div>`;
+
+    const litresVal = c.entity_liters && this._stateVal(c.entity_liters) !== '—'
+      ? this._stateVal(c.entity_liters) : litresText.replace(' L','').replace(',','');
 
     const statsPanel = `
       <div class="stats-panel">
-        ${row('💧','Litres left',   this._stateVal(c.entity_liters || null) !== '—' ? this._stateVal(c.entity_liters) : litresText.replace(' L',''), 'L')}
-        ${row('🚿','Used today',    this._stateVal(c.entity_daily_used), 'L')}
-        ${row('⏱️','Pump today',    this._stateVal(c.entity_pump_today), 'min')}
-        ${row('⚡','Power now',     this._stateVal(c.entity_power, 2), 'kW')}
-        ${row('📅','Daily kWh',     this._stateVal(c.entity_daily_kwh, 2), 'kWh')}
-        ${row('📆','Monthly kWh',   this._stateVal(c.entity_monthly_kwh, 2), 'kWh')}
+        ${row('💧','Litres left',  litresVal, 'L')}
+        ${row('🚿','Used today',   this._stateVal(c.entity_daily_used), 'L')}
+        ${row('⏱️','Pump today',   this._stateVal(c.entity_pump_today), 'min')}
+        ${row('⚡','Power now',    this._stateVal(c.entity_power, 2), 'kW')}
+        ${row('📅','Daily kWh',    this._stateVal(c.entity_daily_kwh, 2), 'kWh')}
+        ${row('📆','Monthly kWh',  this._stateVal(c.entity_monthly_kwh, 2), 'kWh')}
       </div>`;
+
+    // Toggles panel — entities listed under `toggles` config key
+    const toggles = c.toggles || [];
+    const toggleRows = toggles.map(t => {
+      const eid = typeof t === 'string' ? t : t.entity;
+      const lbl = (typeof t === 'object' && t.name) || (this._hass.states[eid]?.attributes?.friendly_name) || eid;
+      const icon = (typeof t === 'object' && t.icon) || null;
+      const s = this._hass.states[eid];
+      const on = s?.state === 'on';
+      const iconHtml = icon
+        ? `<ha-icon icon="${icon}" style="color:${on?'var(--state-icon-active-color,#fbc02d)':'var(--disabled-color,rgba(255,255,255,.3))'}"></ha-icon>`
+        : `<span style="width:24px;display:inline-block"></span>`;
+      return `<div class="toggle-row" data-entity="${eid}">
+        <span class="tog-icon">${iconHtml}</span>
+        <span class="tog-label">${lbl}</span>
+        <button class="tog-btn ${on?'on':''}" data-entity="${eid}" aria-checked="${on}">${on?'ON':'OFF'}</button>
+      </div>`;
+    }).join('');
+
+    const togglesPanel = toggleRows ? `<div class="toggles-panel">${toggleRows}</div>` : '';
 
     this.shadowRoot.innerHTML = `
       <style>
         :host{display:block}
         ha-card{overflow:hidden;background:var(--card-background-color,transparent)!important;border:1px solid var(--divider-color,rgba(255,255,255,.08))!important;box-shadow:var(--ha-card-box-shadow,none)!important}
-        .card-wrap{padding:12px 12px 10px;user-select:none;-webkit-user-select:none;touch-action:manipulation;position:relative}
+        .card-wrap{display:grid;grid-template-columns:1fr 1fr;gap:0;user-select:none;-webkit-user-select:none;touch-action:manipulation;position:relative;min-height:300px}
+        /* LEFT — tank column */
+        .tank-col{padding:12px 8px 12px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer}
         .tank-title{text-align:center;font-size:15px;font-weight:600;color:var(--primary-text-color,#fff);margin-bottom:4px}
-        .tank-svg{display:block;width:100%;max-width:300px;margin:0 auto}
+        .tank-svg{display:block;width:100%;max-width:260px;margin:0 auto}
         .litres-row{text-align:center;margin-top:4px;font-size:14px;color:var(--secondary-text-color,rgba(255,255,255,.6))}
-        .last-updated{text-align:center;font-size:11px;color:var(--secondary-text-color,rgba(255,255,255,.35));margin-top:2px}
-        .pump-runtime{text-align:center;font-size:12px;font-weight:600;color:#ef4444;margin-top:4px;background:rgba(239,68,68,.12);border-radius:12px;padding:2px 10px;display:inline-block;width:100%;box-sizing:border-box}
-        .warn-bar{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);border-radius:8px;padding:5px 10px;margin:6px 0;text-align:center;font-size:12px;font-weight:600;color:#ef4444;animation:wb .9s infinite}
-        @keyframes wb{0%,100%{opacity:1}50%{opacity:.5}}
-        .sparkline-wrap{padding:0 8px 2px}
+        .last-updated{text-align:center;font-size:11px;color:var(--secondary-text-color,rgba(255,255,255,.35));margin-top:3px}
+        .pump-runtime{text-align:center;font-size:12px;font-weight:600;color:#ef4444;margin-top:5px;background:rgba(239,68,68,.12);border-radius:12px;padding:2px 10px;width:100%;box-sizing:border-box}
+        .warn-bar{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);border-radius:8px;padding:5px 8px;margin:5px 0;text-align:center;font-size:11px;font-weight:600;color:#ef4444;animation:wb .9s infinite;width:100%;box-sizing:border-box}
+        .sparkline-wrap{padding:0 4px 2px;width:100%;box-sizing:border-box}
         .sparkline-label{font-size:10px;color:var(--secondary-text-color,rgba(255,255,255,.35));text-align:center;margin-top:1px}
-        .stats-panel{margin-top:8px;border-top:1px solid var(--divider-color,rgba(255,255,255,.08));padding-top:8px;display:flex;flex-direction:column;gap:5px}
-        .stat-row{display:flex;align-items:center;gap:8px;font-size:13px;padding:2px 0}
-        .stat-icon{width:20px;text-align:center;font-size:14px}
-        .stat-label{flex:1;color:var(--secondary-text-color,rgba(255,255,255,.6))}
-        .stat-val{font-weight:600;color:var(--primary-text-color,#fff);text-align:right}
-        .stat-val small{font-weight:400;font-size:11px;color:var(--secondary-text-color,rgba(255,255,255,.5));margin-left:2px}
         @keyframes wv{0%{transform:translateX(0)}100%{transform:translateX(-120px)}}
         .wl{animation:wv 4s linear infinite}
+        .warn-abs{position:absolute;top:10px;left:10px;font-size:20px;animation:wb .9s infinite}
+        @keyframes wb{0%,100%{opacity:1}50%{opacity:.5}}
         ${pumpOn?'@keyframes pp{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.1)}}.pump-icon{animation:pp .8s infinite}':''}
         .pump-icon{cursor:pointer}
-        .warn-abs{position:absolute;top:10px;right:10px;font-size:20px;animation:wb .9s infinite}
+        /* RIGHT — info column */
+        .info-col{padding:12px 12px 12px 8px;border-left:1px solid var(--divider-color,rgba(255,255,255,.08));display:flex;flex-direction:column;gap:0}
+        /* Toggles */
+        .toggles-panel{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--divider-color,rgba(255,255,255,.08))}
+        .toggle-row{display:flex;align-items:center;gap:8px}
+        .tog-icon{width:24px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .tog-label{flex:1;font-size:13px;color:var(--primary-text-color,#fff)}
+        .tog-btn{border:none;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;min-width:42px;transition:background .2s}
+        .tog-btn.on{background:#43a047;color:#fff}
+        .tog-btn:not(.on){background:rgba(255,255,255,.12);color:var(--secondary-text-color,rgba(255,255,255,.5))}
+        /* Stats */
+        .stats-panel{display:flex;flex-direction:column;gap:6px}
+        .stat-row{display:flex;align-items:center;gap:8px;font-size:13px}
+        .stat-icon{width:22px;text-align:center;font-size:14px;flex-shrink:0}
+        .stat-label{flex:1;color:var(--secondary-text-color,rgba(255,255,255,.6));font-size:12px}
+        .stat-val{font-weight:600;color:var(--primary-text-color,#fff);text-align:right;white-space:nowrap}
+        .stat-val small{font-weight:400;font-size:11px;color:var(--secondary-text-color,rgba(255,255,255,.5));margin-left:2px}
       </style>
       <ha-card>
         <div class="card-wrap">
           ${isLow?'<div class="warn-abs">⚠️</div>':''}
-          <div class="tank-title">${title}</div>
-          <svg class="tank-svg" viewBox="0 0 300 370" xmlns="http://www.w3.org/2000/svg">
-            ${svgDefs}${svgBody}
-            ${pe?`<g class="pump-icon" id="pumpIcon" transform="translate(${150-15},${pumpY-15}) scale(1.25)" style="filter:${pumpGlow}">${pumpPath}</g>`:''}
-            <text x="150" y="230" text-anchor="middle" dominant-baseline="central" font-size="52" font-weight="800" fill="#fff" filter="url(#ts)">${p}%</text>
-          </svg>
-          ${litresText?`<div class="litres-row">${litresText}</div>`:''}
-          ${isLow?`<div class="warn-bar">⚠️ Tank below ${warnBelow}% — ${litresText||p+'%'} remaining</div>`:''}
-          ${runtimeText?`<div class="pump-runtime">⚡ ${runtimeText}</div>`:''}
-          <div class="last-updated">${updatedText}</div>
-          ${sparkline?`<div class="sparkline-wrap">${sparkline}<div class="sparkline-label">24h history</div></div>`:''}
-          ${statsPanel}
+
+          <!-- LEFT: tank -->
+          <div class="tank-col">
+            <div class="tank-title">${title}</div>
+            <svg class="tank-svg" viewBox="0 0 300 370" xmlns="http://www.w3.org/2000/svg">
+              ${svgDefs}${svgBody}
+              ${pe?`<g class="pump-icon" id="pumpIcon" transform="translate(${150-15},${pumpY-15}) scale(1.25)" style="filter:${pumpGlow}">${pumpPath}</g>`:''}
+              <text x="150" y="230" text-anchor="middle" dominant-baseline="central" font-size="52" font-weight="800" fill="#fff" filter="url(#ts)">${p}%</text>
+            </svg>
+            ${litresText?`<div class="litres-row">${litresText}</div>`:''}
+            ${isLow?`<div class="warn-bar">⚠️ Below ${warnBelow}% — ${litresText||p+'%'} left</div>`:''}
+            ${runtimeText?`<div class="pump-runtime">⚡ ${runtimeText}</div>`:''}
+            <div class="last-updated">${updatedText}</div>
+            ${sparkline?`<div class="sparkline-wrap">${sparkline}<div class="sparkline-label">24h history</div></div>`:''}
+          </div>
+
+          <!-- RIGHT: toggles + stats -->
+          <div class="info-col">
+            ${togglesPanel}
+            ${statsPanel}
+          </div>
         </div>
       </ha-card>`;
 
-    const wrap = this.shadowRoot.querySelector('.card-wrap');
-    if (wrap && !wrap._bound) {
-      wrap._bound = true;
-      wrap.addEventListener('pointerdown', () => { this._isHold=false; this._holdTimer=setTimeout(()=>{this._isHold=true;this._handleHold();},500); });
-      wrap.addEventListener('pointerup', () => { clearTimeout(this._holdTimer); });
-      wrap.addEventListener('pointerleave', () => clearTimeout(this._holdTimer));
+    // Tank column tap/hold
+    const tankCol = this.shadowRoot.querySelector('.tank-col');
+    if (tankCol && !tankCol._bound) {
+      tankCol._bound = true;
+      tankCol.addEventListener('pointerdown', () => { this._isHold=false; this._holdTimer=setTimeout(()=>{this._isHold=true;this._handleHold();},500); });
+      tankCol.addEventListener('pointerup', () => { clearTimeout(this._holdTimer); if (!this._isHold) this._handleTap(); });
+      tankCol.addEventListener('pointerleave', () => clearTimeout(this._holdTimer));
     }
     const pi = this.shadowRoot.querySelector('#pumpIcon');
-    if (pi) pi.addEventListener('click', e => { e.stopPropagation(); this._handleTap(); });
+    if (pi) pi.addEventListener('click', e => { e.stopPropagation(); this._togglePump(); });
+
+    // Toggle buttons
+    this.shadowRoot.querySelectorAll('.tog-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const eid = btn.dataset.entity;
+        if (eid) this._hass.callService('switch', 'toggle', { entity_id: eid });
+      });
+    });
   }
 }
 
