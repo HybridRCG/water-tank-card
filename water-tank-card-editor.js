@@ -106,7 +106,7 @@ class WaterTankCardEditor extends HTMLElement {
         </label>
 
         <div class="section">Navigation</div>
-        <label>Hold to Navigate (path)
+        <label>Tap to Navigate (path)
           <input type="text" data-field="navigate_to" value="${c.navigate_to || ''}" placeholder="/lovelace/tanks">
         </label>
       </div>`;

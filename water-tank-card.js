@@ -1,4 +1,4 @@
-const CARD_VERSION = '3.5.0';
+const CARD_VERSION = '3.6.0';
 
 // ══════════════════════════════════════════════════════════
 //  EDITOR  — renders once, updates values in-place on change
@@ -59,7 +59,8 @@ class WaterTankCardEditor extends HTMLElement {
     set('pump_confirmation', c.pump_confirmation);
     set('history_entity', c.history_entity);
     set('navigate_to', c.navigate_to);
-    set('tap_action', c.tap_action || 'pump');
+    set('tap_action',  c.tap_action  || 'navigate');
+    set('hold_action', c.hold_action || 'toggle-pump');
   }
 
   _render() {
@@ -128,14 +129,25 @@ class WaterTankCardEditor extends HTMLElement {
             placeholder="Are you sure you want to Toggle the Borehole Pump?">
         </label>
 
-        <div class="section">Tap Action</div>
-        <label>What happens when you tap the card
-          <select data-field="tap_action">
-            <option value="pump"${(!c.tap_action || c.tap_action === 'pump') ? ' selected' : ''}>Toggle pump</option>
-            <option value="more-info"${c.tap_action === 'more-info' ? ' selected' : ''}>More info (level entity)</option>
-            <option value="none"${c.tap_action === 'none' ? ' selected' : ''}>None</option>
-          </select>
-        </label>
+        <div class="section">Actions</div>
+        <div class="row">
+          <label><span>Tap</span>
+            <select data-field="tap_action">
+              <option value="navigate"${(!c.tap_action || c.tap_action === 'navigate') ? ' selected' : ''}>Navigate</option>
+              <option value="toggle-pump"${c.tap_action === 'toggle-pump' ? ' selected' : ''}>Toggle pump</option>
+              <option value="more-info"${c.tap_action === 'more-info' ? ' selected' : ''}>More info</option>
+              <option value="none"${c.tap_action === 'none' ? ' selected' : ''}>None</option>
+            </select>
+          </label>
+          <label><span>Hold</span>
+            <select data-field="hold_action">
+              <option value="toggle-pump"${(!c.hold_action || c.hold_action === 'toggle-pump') ? ' selected' : ''}>Toggle pump</option>
+              <option value="navigate"${c.hold_action === 'navigate' ? ' selected' : ''}>Navigate</option>
+              <option value="more-info"${c.hold_action === 'more-info' ? ' selected' : ''}>More info</option>
+              <option value="none"${c.hold_action === 'none' ? ' selected' : ''}>None</option>
+            </select>
+          </label>
+        </div>
 
         <div class="section">Navigation</div>
         <label>Hold to Navigate (Lovelace path)
@@ -331,21 +343,27 @@ class WaterTankCard extends HTMLElement {
     return '';
   }
 
-  _handleTap() {
-    if (!this._hass || !this._config) return;
-    const action = this._config.tap_action || (this._config.pump_entity ? 'pump' : 'none');
-    if (action === 'more-info') { this._fireMoreInfo(this._config.entity_level); return; }
-    if (action === 'pump' && this._config.pump_entity) {
-      const msg = this._config.pump_confirmation || 'Are you sure you want to Toggle the Borehole Pump?';
-      if (confirm(msg)) this._hass.callService('switch', 'toggle', { entity_id: this._config.pump_entity });
-    }
-  }
-
-  _handleHold() {
+  _navigate() {
     if (!this._config) return;
     const nav = this._config.navigate_to || '';
     if (nav) { window.history.pushState(null, '', nav); window.dispatchEvent(new Event('location-changed')); }
   }
+
+  _togglePump() {
+    if (!this._hass || !this._config || !this._config.pump_entity) return;
+    const msg = this._config.pump_confirmation || 'Are you sure you want to Toggle the Borehole Pump?';
+    if (confirm(msg)) this._hass.callService('switch', 'toggle', { entity_id: this._config.pump_entity });
+  }
+
+  _runAction(actionKey) {
+    const action = this._config[actionKey] || (actionKey === 'tap_action' ? 'navigate' : 'toggle-pump');
+    if (action === 'navigate')    { this._navigate(); return; }
+    if (action === 'toggle-pump') { this._togglePump(); return; }
+    if (action === 'more-info')   { this._fireMoreInfo(this._config.entity_level); return; }
+  }
+
+  _handleTap()  { if (!this._hass || !this._config) return; this._runAction('tap_action'); }
+  _handleHold() { if (!this._hass || !this._config) return; this._runAction('hold_action'); }
 
   _bindEvents() {
     const el = this.shadowRoot.querySelector('.card-touch');
