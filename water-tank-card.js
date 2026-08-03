@@ -1,4 +1,4 @@
-const CARD_VERSION = '3.9.0';
+const CARD_VERSION = '4.0.0';
 
 // ══════════════════════════════════════════════════════════
 //  EDITOR
@@ -289,6 +289,17 @@ class WaterTankCard extends HTMLElement {
     return isNaN(n) ? s.state : (decimals ? n.toFixed(decimals) : Math.round(n).toLocaleString());
   }
 
+  _minsText(entityId) {
+    if (!entityId || !this._hass) return '—';
+    const s = this._hass.states[entityId];
+    if (!s || s.state === 'unknown' || s.state === 'unavailable') return '—';
+    const total = Math.round(parseFloat(s.state));
+    if (isNaN(total)) return s.state;
+    if (total < 60) return `${total} min`;
+    const h = Math.floor(total / 60), m = total % 60;
+    return m > 0 ? `${h}h ${m}min` : `${h}h`;
+  }
+
   _navigate() {
     const nav = this._config?.navigate_to;
     if (nav) { window.history.pushState(null,'',nav); window.dispatchEvent(new Event('location-changed')); }
@@ -429,7 +440,7 @@ class WaterTankCard extends HTMLElement {
       <div class="stats-panel">
         ${row('💧','Litres left',  litresVal, 'L')}
         ${row('🚿','Used today',   this._stateVal(c.entity_daily_used), 'L')}
-        ${row('⏱️','Pump today',   this._stateVal(c.entity_pump_today), 'min')}
+        ${row('⏱️','Pump today',   this._minsText(c.entity_pump_today))}
         ${row('⚡','Power now',    this._stateVal(c.entity_power, 2), 'kW')}
         ${row('📅','Daily kWh',    this._stateVal(c.entity_daily_kwh, 2), 'kWh')}
         ${row('📆','Monthly kWh',  this._stateVal(c.entity_monthly_kwh, 2), 'kWh')}
