@@ -1,4 +1,4 @@
-const CARD_VERSION = '3.6.0';
+const CARD_VERSION = '3.7.0';
 
 // ══════════════════════════════════════════════════════════
 //  EDITOR  — renders once, updates values in-place on change
