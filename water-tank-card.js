@@ -1,4 +1,4 @@
-const CARD_VERSION = '4.1.1';
+const CARD_VERSION = '4.1.2';
 
 // ══════════════════════════════════════════════════════════
 //  EDITOR
@@ -482,11 +482,11 @@ class WaterTankCard extends HTMLElement {
       <style>
         :host{display:block}
         ha-card{overflow:hidden;background:var(--card-background-color,transparent)!important;border:1px solid var(--divider-color,rgba(255,255,255,.08))!important;box-shadow:var(--ha-card-box-shadow,none)!important}
-        .card-wrap{display:grid;grid-template-columns:1fr 1fr;gap:0;user-select:none;-webkit-user-select:none;touch-action:manipulation;position:relative;min-height:300px}
-        /* LEFT — tank column */
-        .tank-col{padding:12px 8px 12px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer}
+        .card-wrap{display:grid;grid-template-columns:1fr;gap:0;user-select:none;-webkit-user-select:none;touch-action:manipulation;position:relative;min-height:300px}
+        /* TOP — tank column (stacked layout) */
+        .tank-col{padding:12px 12px 8px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer}
         .tank-title{text-align:center;font-size:15px;font-weight:600;color:var(--primary-text-color,#fff);margin-bottom:4px}
-        .tank-svg{display:block;width:100%;max-width:260px;margin:0 auto}
+        .tank-svg{display:block;width:100%;max-width:380px;margin:0 auto}
         .litres-row{text-align:center;margin-top:4px;font-size:14px;color:var(--secondary-text-color,rgba(255,255,255,.6))}
         .last-updated{text-align:center;font-size:11px;color:var(--secondary-text-color,rgba(255,255,255,.35));margin-top:3px}
         .pump-runtime{text-align:center;font-size:12px;font-weight:600;color:#ef4444;margin-top:5px;background:rgba(239,68,68,.12);border-radius:12px;padding:2px 10px;width:100%;box-sizing:border-box}
@@ -499,8 +499,8 @@ class WaterTankCard extends HTMLElement {
         @keyframes wb{0%,100%{opacity:1}50%{opacity:.5}}
         ${pumpOn?'@keyframes pp{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.1)}}.pump-icon{animation:pp .8s infinite}':''}
         .pump-icon{cursor:pointer}
-        /* RIGHT — info column */
-        .info-col{padding:12px 12px 12px 8px;border-left:1px solid var(--divider-color,rgba(255,255,255,.08));display:flex;flex-direction:column;gap:0}
+        /* BELOW — info column (stacked layout) */
+        .info-col{padding:12px;border-top:1px solid var(--divider-color,rgba(255,255,255,.08));display:flex;flex-direction:column;gap:0}
         /* Toggles */
         .toggles-panel{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--divider-color,rgba(255,255,255,.08))}
         .toggle-row{display:flex;align-items:center;gap:8px}
