@@ -1,4 +1,4 @@
-const CARD_VERSION = '4.1.2';
+const CARD_VERSION = '4.1.3';
 
 // ══════════════════════════════════════════════════════════
 //  EDITOR
@@ -72,7 +72,7 @@ class WaterTankCardEditor extends HTMLElement {
         <div class="sec">Display</div>
         <div class="row">
           <label><span>Title</span><input type="text" data-field="title" value="${c.title||''}"></label>
-          <label><span>Mode</span>${sel('mode',['compact','full'].map(v=>opt(v,v[0].toUpperCase()+v.slice(1),c.mode||'compact')).join(''))}</label>
+          <label><span>Mode</span>${sel('mode',['compact','medium','full'].map(v=>opt(v,v[0].toUpperCase()+v.slice(1),c.mode||'compact')).join(''))}</label>
         </div>
         <div class="row">
           <label><span>Tank Capacity (L)</span><input type="number" data-field="tank_capacity" value="${c.tank_capacity||''}" placeholder="5000"></label>
@@ -182,7 +182,7 @@ class WaterTankCard extends HTMLElement {
     this._lastPct = pctRaw; this._lastPumpOn = pumpOn; this._lastMode = mode;
     this._render();
 
-    if (mode === 'full') {
+    if (mode === 'full' || mode === 'medium') {
       const now = Date.now();
       if (!this._lastHistoryFetch || now - this._lastHistoryFetch > 60000) {
         this._lastHistoryFetch = now;
@@ -221,10 +221,16 @@ class WaterTankCard extends HTMLElement {
     return `Updated ${Math.floor(mins/60)}h ${mins%60}m ago`;
   }
 
-  getCardSize() { return this._config && this._config.mode === 'full' ? 5 : 2; }
+  getCardSize() {
+    const m = this._config ? this._config.mode : 'compact';
+    if (m === 'full') return 8;
+    if (m === 'medium') return 5;
+    return 2;
+  }
   getGridOptions() {
     const m = this._config ? this._config.mode : 'compact';
-    if (m === 'full') return { columns:6,rows:5,min_columns:3,min_rows:3,max_columns:12,max_rows:12 };
+    if (m === 'full') return { columns:6,rows:8,min_columns:3,min_rows:5,max_columns:12,max_rows:14 };
+    if (m === 'medium') return { columns:6,rows:5,min_columns:3,min_rows:3,max_columns:12,max_rows:12 };
     return { columns:3,rows:2,min_columns:2,min_rows:2,max_columns:6,max_rows:4 };
   }
 
@@ -436,7 +442,15 @@ class WaterTankCard extends HTMLElement {
       return;
     }
 
-    // ════════ FULL ════════
+    // ════════ MEDIUM / FULL ════════
+    const isMedium = mode === 'medium';
+    const gridCols = isMedium ? '1fr 1fr' : '1fr';
+    const tankPad = isMedium ? '12px 8px 12px 12px' : '12px 12px 8px 12px';
+    const tankMaxW = isMedium ? '260px' : '380px';
+    const infoBorderCss = isMedium
+      ? 'border-left:1px solid var(--divider-color,rgba(255,255,255,.08))'
+      : 'border-top:1px solid var(--divider-color,rgba(255,255,255,.08))';
+    const infoPad = isMedium ? '12px 12px 12px 8px' : '12px';
     const sparkline = this._sparklineSvg(this._history);
     const updatedText = this._updatedText();
     const runtimeText = pumpOn ? this._runtimeText() : '';
@@ -482,11 +496,11 @@ class WaterTankCard extends HTMLElement {
       <style>
         :host{display:block}
         ha-card{overflow:hidden;background:var(--card-background-color,transparent)!important;border:1px solid var(--divider-color,rgba(255,255,255,.08))!important;box-shadow:var(--ha-card-box-shadow,none)!important}
-        .card-wrap{display:grid;grid-template-columns:1fr;gap:0;user-select:none;-webkit-user-select:none;touch-action:manipulation;position:relative;min-height:300px}
-        /* TOP — tank column (stacked layout) */
-        .tank-col{padding:12px 12px 8px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer}
+        .card-wrap{display:grid;grid-template-columns:${gridCols};gap:0;user-select:none;-webkit-user-select:none;touch-action:manipulation;position:relative;min-height:300px}
+        /* Tank column */
+        .tank-col{padding:${tankPad};display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer}
         .tank-title{text-align:center;font-size:15px;font-weight:600;color:var(--primary-text-color,#fff);margin-bottom:4px}
-        .tank-svg{display:block;width:100%;max-width:380px;margin:0 auto}
+        .tank-svg{display:block;width:100%;max-width:${tankMaxW};margin:0 auto}
         .litres-row{text-align:center;margin-top:4px;font-size:14px;color:var(--secondary-text-color,rgba(255,255,255,.6))}
         .last-updated{text-align:center;font-size:11px;color:var(--secondary-text-color,rgba(255,255,255,.35));margin-top:3px}
         .pump-runtime{text-align:center;font-size:12px;font-weight:600;color:#ef4444;margin-top:5px;background:rgba(239,68,68,.12);border-radius:12px;padding:2px 10px;width:100%;box-sizing:border-box}
@@ -499,8 +513,8 @@ class WaterTankCard extends HTMLElement {
         @keyframes wb{0%,100%{opacity:1}50%{opacity:.5}}
         ${pumpOn?'@keyframes pp{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.1)}}.pump-icon{animation:pp .8s infinite}':''}
         .pump-icon{cursor:pointer}
-        /* BELOW — info column (stacked layout) */
-        .info-col{padding:12px;border-top:1px solid var(--divider-color,rgba(255,255,255,.08));display:flex;flex-direction:column;gap:0}
+        /* Info column */
+        .info-col{padding:${infoPad};${infoBorderCss};display:flex;flex-direction:column;gap:0}
         /* Toggles */
         .toggles-panel{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--divider-color,rgba(255,255,255,.08))}
         .toggle-row{display:flex;align-items:center;gap:8px}
