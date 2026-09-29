@@ -1,4 +1,46 @@
-const CARD_VERSION = '4.1.3';
+const CARD_VERSION = '4.2.0';
+
+// ── Shared helpers ─────────────────────────────────────────
+const WTC_ESC = s => String(s ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const WTC_BAD = s => !s || s.state === 'unknown' || s.state === 'unavailable';
+// Domains with their own <domain>.toggle service; anything else falls back to homeassistant.toggle
+const WTC_TOGGLE_DOMAINS = ['switch','input_boolean','light','fan','automation','script','siren','humidifier','media_player','remote','cover'];
+const WTC_ON_STATES = ['on','open','opening','playing','home'];
+
+// Minimal parser for the editor's toggles textarea:
+//   - entity: switch.x        (or shorthand "- switch.x")
+//     name: Label
+//     icon: mdi:thing
+//     confirmation: Are you sure?
+function wtcParseToggles(text) {
+  const out = [];
+  let cur = null;
+  const clean = v => v.trim().replace(/^(['"])(.*)\1$/, '$2');
+  String(text || '').split(/\r?\n/).forEach(raw => {
+    const line = raw.replace(/\s+#.*$/, '');
+    if (!line.trim()) return;
+    const item = line.match(/^\s*-\s*(.*)$/);
+    const body = item ? item[1] : line.trim();
+    if (item) { cur = {}; out.push(cur); }
+    if (!cur) return;
+    const kv = body.match(/^([a-z_]+)\s*:\s*(.*)$/i);
+    if (kv) { const v = clean(kv[2]); if (v) cur[kv[1].toLowerCase()] = v; }
+    else if (item && body.includes('.')) cur.entity = clean(body);
+  });
+  return out.filter(t => t.entity).map(t => {
+    const o = { entity: t.entity };
+    ['name','icon','confirmation'].forEach(k => { if (t[k]) o[k] = t[k]; });
+    return o;
+  });
+}
+function wtcTogglesToText(toggles) {
+  return (toggles || []).map(t => {
+    if (typeof t === 'string') return `- entity: ${t}`;
+    let s = `- entity: ${t.entity}`;
+    ['name','icon','confirmation'].forEach(k => { if (t[k]) s += `\n  ${k}: ${t[k]}`; });
+    return s;
+  }).join('\n');
+}
 
 // ══════════════════════════════════════════════════════════
 //  EDITOR
@@ -33,12 +75,13 @@ class WaterTankCardEditor extends HTMLElement {
 
   _updateValues() {
     const c = this._config;
-    const set = (f, v) => { const el = this.shadowRoot.querySelector(`[data-field="${f}"]`); if (el && document.activeElement !== el) el.value = v || ''; };
+    const set = (f, v) => { const el = this.shadowRoot.querySelector(`[data-field="${f}"]:not([data-picker])`); if (el && this.shadowRoot.activeElement !== el) el.value = v ?? ''; };
     set('title', c.title); set('mode', c.mode || 'compact');
     set('tank_capacity', c.tank_capacity || ''); set('warn_below', c.warn_below ?? 50);
     set('tank_color', c.tank_color || c.fill_color || '#1a78c2');
     set('pump_confirmation', c.pump_confirmation); set('navigate_to', c.navigate_to);
     set('tap_action', c.tap_action || 'navigate'); set('hold_action', c.hold_action || 'toggle-pump');
+    set('toggles', wtcTogglesToText(c.toggles));
     ['entity_level','pump_entity','history_entity','entity_liters',
      'entity_daily_used','entity_pump_today','entity_power',
      'entity_daily_kwh','entity_monthly_kwh'].forEach(f => {
@@ -71,7 +114,7 @@ class WaterTankCardEditor extends HTMLElement {
 
         <div class="sec">Display</div>
         <div class="row">
-          <label><span>Title</span><input type="text" data-field="title" value="${c.title||''}"></label>
+          <label><span>Title</span><input type="text" data-field="title" value="${WTC_ESC(c.title)}"></label>
           <label><span>Mode</span>${sel('mode',['compact','medium','full'].map(v=>opt(v,v[0].toUpperCase()+v.slice(1),c.mode||'compact')).join(''))}</label>
         </div>
         <div class="row">
@@ -82,14 +125,14 @@ class WaterTankCardEditor extends HTMLElement {
 
         <div class="sec">Pump</div>
         <label><span>Pump Entity</span>${this._picker('pump_entity')}</label>
-        <label><span>Confirmation Message</span><input type="text" data-field="pump_confirmation" value="${c.pump_confirmation||''}" placeholder="Are you sure?"></label>
+        <label><span>Confirmation Message</span><input type="text" data-field="pump_confirmation" value="${WTC_ESC(c.pump_confirmation)}" placeholder="Are you sure?"></label>
 
         <div class="sec">Actions</div>
         <div class="row">
           <label><span>Tap</span>${sel('tap_action', actionOpts(c.tap_action||'navigate'))}</label>
           <label><span>Hold</span>${sel('hold_action', actionOpts(c.hold_action||'toggle-pump'))}</label>
         </div>
-        <label><span>Navigate To</span><input type="text" data-field="navigate_to" value="${c.navigate_to||''}" placeholder="/lovelace/jojo"></label>
+        <label><span>Navigate To</span><input type="text" data-field="navigate_to" value="${WTC_ESC(c.navigate_to)}" placeholder="/lovelace/jojo"></label>
 
         <div class="sec">Stats Panel (Full mode)</div>
         <label><span>Litres Left Entity</span>${this._picker('entity_liters')}</label>
@@ -99,9 +142,10 @@ class WaterTankCardEditor extends HTMLElement {
         <label><span>Daily kWh Entity</span>${this._picker('entity_daily_kwh')}</label>
         <label><span>Monthly kWh Entity</span>${this._picker('entity_monthly_kwh')}</label>
 
-        <div class="sec">Toggles Panel (Full mode — right column)</div>
-        <label><span>Toggles YAML (paste entity list)</span>
-          <textarea data-field="toggles_yaml" rows="5" style="font-size:11px;font-family:monospace;padding:6px;border-radius:6px;border:1px solid var(--divider-color,#ccc);background:var(--card-background-color,#fff);color:var(--primary-text-color);width:100%;box-sizing:border-box;resize:vertical">${c.toggles ? c.toggles.map(t=>typeof t==='string'?'- entity: '+t:'- entity: '+t.entity+(t.name?'\n  name: '+t.name:'')+(t.icon?'\n  icon: '+t.icon:'')).join('\n') : ''}</textarea>
+        <div class="sec">Toggles Panel (Medium / Full mode)</div>
+        <label><span>Toggles (one entity per item)</span>
+          <textarea data-field="toggles" rows="7" spellcheck="false" placeholder="- entity: switch.borehole&#10;  name: Borehole&#10;  icon: mdi:electric-switch&#10;  confirmation: Toggle the pump?" style="font-size:11px;font-family:monospace;padding:6px;border-radius:6px;border:1px solid var(--divider-color,#ccc);background:var(--card-background-color,#fff);color:var(--primary-text-color);width:100%;box-sizing:border-box;resize:vertical">${WTC_ESC(wtcTogglesToText(c.toggles))}</textarea>
+          <small style="font-size:11px;color:var(--secondary-text-color)">Works with switch, input_boolean, light, fan, automation and more. Optional keys: name, icon, confirmation.</small>
         </label>
         <div class="sec">History Sparkline</div>
         <label><span>History Entity</span>${this._picker('history_entity')}</label>
@@ -110,8 +154,16 @@ class WaterTankCardEditor extends HTMLElement {
     this.shadowRoot.querySelectorAll('[data-field]:not([data-picker])').forEach(el => {
       el.addEventListener(el.type === 'color' ? 'input' : 'change', e => {
         const f = e.target.dataset.field, v = e.target.value;
-        if (v === '') { const c2={...this._config}; delete c2[f]; this._config=c2; }
-        else this._config = {...this._config, [f]: ['tank_capacity','warn_below'].includes(f) ? parseFloat(v) : v};
+        const c2 = { ...this._config };
+        delete c2.toggles_yaml; // legacy junk key written by <= 4.1.3 editor
+        if (f === 'toggles') {
+          const list = wtcParseToggles(v);
+          if (list.length) c2.toggles = list; else delete c2.toggles;
+        } else if (v === '') delete c2[f];
+        else if (['tank_capacity','warn_below'].includes(f)) {
+          const n = parseFloat(v); if (isNaN(n)) delete c2[f]; else c2[f] = n;
+        } else c2[f] = v;
+        this._config = c2;
         this._dispatch();
       });
     });
@@ -141,60 +193,86 @@ class WaterTankCard extends HTMLElement {
     this._holdTimer = null;
     this._isHold = false;
     this._history = [];
-    this._lastPct = null;
+    this._lastSig = null;
     this._lastPumpOn = null;
-    this._lastMode = null;
     this._pumpStartTime = null;
     this._tickTimer = null;
+    this._lastHistoryFetch = 0;
+    this._pending = {};          // entity_id -> timeout while a toggle is in flight
     this.attachShadow({ mode: 'open' });
   }
 
-  static getStubConfig() { return { entity_level: '', title: 'Jojo', mode: 'compact' }; }
+  static getStubConfig(hass) {
+    const guess = hass ? Object.keys(hass.states).find(e => e.startsWith('sensor.') && /tank|level|jojo/i.test(e)) : '';
+    return { entity_level: guess || '', title: 'Water Tank', mode: 'compact' };
+  }
   static getConfigElement() { return document.createElement('water-tank-card-editor'); }
 
   setConfig(config) {
-    if (!config.entity_level) throw new Error('entity_level is required');
+    if (!config || !config.entity_level) throw new Error('entity_level is required');
     this._config = config;
-    this._lastPct = null; this._lastPumpOn = null; this._lastMode = null;
+    this._lastSig = null; this._lastHistoryFetch = 0;
+    if (this._hass) this.hass = this._hass;
+  }
+
+  connectedCallback() {
+    this._startTick();
+    if (this._hass && this._config) { this._lastSig = null; this.hass = this._hass; }
+  }
+  disconnectedCallback() {
+    this._stopTick();
+    clearTimeout(this._holdTimer);
+    Object.values(this._pending).forEach(clearTimeout);
+    this._pending = {};
+  }
+
+  // Every entity whose state is shown on the card — any change to these re-renders.
+  _watched() {
+    const c = this._config;
+    const ids = [c.entity_level, c.entity_liters, c.pump_entity, c.entity_daily_used,
+      c.entity_pump_today, c.entity_power, c.entity_daily_kwh, c.entity_monthly_kwh];
+    (c.toggles || []).forEach(t => ids.push(typeof t === 'string' ? t : t?.entity));
+    return [...new Set(ids.filter(Boolean))];
   }
 
   set hass(hass) {
     this._hass = hass;
     if (!this._config) return;
-    const level = hass.states[this._config.entity_level];
-    const pctRaw = level && level.state !== 'unknown' && level.state !== 'unavailable'
-      ? Math.round(parseFloat(String(level.state).match(/[\d.]+/)?.[0]) || 0) : -1;
+    const mode = this._config.mode || 'compact';
     const pe = this._config.pump_entity;
     const pump = pe ? hass.states[pe] : null;
     const pumpOn = pump ? pump.state === 'on' : false;
-    const mode = this._config.mode || 'compact';
 
     // Track pump start time for runtime counter
-    if (pumpOn && !this._lastPumpOn) {
-      this._pumpStartTime = pump.last_changed ? new Date(pump.last_changed) : new Date();
-      this._startTick();
-    } else if (!pumpOn) {
-      this._stopTick();
-      this._pumpStartTime = null;
-    }
+    if (pumpOn && !this._lastPumpOn) this._pumpStartTime = pump.last_changed ? new Date(pump.last_changed) : new Date();
+    else if (!pumpOn) this._pumpStartTime = null;
+    this._lastPumpOn = pumpOn;
 
-    if (pctRaw === this._lastPct && pumpOn === this._lastPumpOn && mode === this._lastMode) return;
-    this._lastPct = pctRaw; this._lastPumpOn = pumpOn; this._lastMode = mode;
+    const sig = mode + '|' + this._watched().map(id => {
+      const s = hass.states[id];
+      return s ? s.state + (s.attributes?.unit_of_measurement || '') + (s.attributes?.friendly_name || '') : '∅';
+    }).join('|');
+    if (sig === this._lastSig) return;
+    this._lastSig = sig;
+    Object.values(this._pending).forEach(clearTimeout); this._pending = {};
     this._render();
+    this._maybeFetchHistory();
+  }
 
-    if (mode === 'full' || mode === 'medium') {
-      const now = Date.now();
-      if (!this._lastHistoryFetch || now - this._lastHistoryFetch > 60000) {
-        this._lastHistoryFetch = now;
-        this._fetchHistory();
-      }
+  _maybeFetchHistory(force = false) {
+    const mode = this._config?.mode || 'compact';
+    if (mode !== 'full' && mode !== 'medium') return;
+    const now = Date.now();
+    if (force || now - this._lastHistoryFetch > 300000) {
+      this._lastHistoryFetch = now;
+      this._fetchHistory();
     }
   }
 
-  // Tick every 60s to update pump runtime + last-updated without full re-render
+  // Tick every 60s: refresh pump runtime + "updated x ago" text, and the sparkline every 5 min
   _startTick() {
     if (this._tickTimer) return;
-    this._tickTimer = setInterval(() => this._updateTickers(), 60000);
+    this._tickTimer = setInterval(() => { this._updateTickers(); this._maybeFetchHistory(); }, 60000);
   }
   _stopTick() { if (this._tickTimer) { clearInterval(this._tickTimer); this._tickTimer = null; } }
 
@@ -240,7 +318,7 @@ class WaterTankCard extends HTMLElement {
     const end = new Date(), start = new Date(end - 86400000);
     try {
       const res = await this._hass.callApi('GET',
-        `history/period/${start.toISOString()}?filter_entity_id=${id}&end_time=${end.toISOString()}&minimal_response=true&no_attributes=true`);
+        `history/period/${start.toISOString()}?filter_entity_id=${encodeURIComponent(id)}&end_time=${end.toISOString()}&minimal_response=true&no_attributes=true`);
       if (res?.[0]?.length > 1) {
         this._history = res[0]
           .filter(s => s.state !== 'unknown' && s.state !== 'unavailable')
@@ -295,6 +373,11 @@ class WaterTankCard extends HTMLElement {
     return isNaN(n) ? s.state : (decimals ? n.toFixed(decimals) : Math.round(n).toLocaleString());
   }
 
+  _unit(entityId, fallback = '') {
+    const s = entityId && this._hass ? this._hass.states[entityId] : null;
+    return s?.attributes?.unit_of_measurement || fallback;
+  }
+
   _minsText(entityId) {
     if (!entityId || !this._hass) return '—';
     const s = this._hass.states[entityId];
@@ -320,12 +403,39 @@ class WaterTankCard extends HTMLElement {
 
   _navigate() {
     const nav = this._config?.navigate_to;
-    if (nav) { window.history.pushState(null,'',nav); window.dispatchEvent(new Event('location-changed')); }
+    if (nav) { window.history.pushState(null,'',nav); window.dispatchEvent(new CustomEvent('location-changed', { detail: { replace: false } })); }
   }
+
+  // Toggle any toggle-able entity using its own domain's service
+  _callToggle(eid) {
+    if (!this._hass || !eid) return;
+    const domain = eid.split('.')[0];
+    if (WTC_TOGGLE_DOMAINS.includes(domain)) this._hass.callService(domain, 'toggle', { entity_id: eid });
+    else this._hass.callService('homeassistant', 'toggle', { entity_id: eid });
+  }
+
   _togglePump() {
     if (!this._hass || !this._config?.pump_entity) return;
-    const msg = this._config.pump_confirmation || 'Are you sure you want to Toggle the Borehole Pump?';
-    if (confirm(msg)) this._hass.callService('switch','toggle',{entity_id:this._config.pump_entity});
+    const msg = this._config.pump_confirmation || 'Are you sure you want to toggle the pump?';
+    if (confirm(msg)) this._callToggle(this._config.pump_entity);
+  }
+
+  // Toggle-panel button: optimistic UI, then the real state wins on the next hass update.
+  _onToggleClick(btn) {
+    const eid = btn.dataset.entity;
+    if (!eid || btn.disabled) return;
+    const t = (this._config.toggles || []).find(x => (typeof x === 'string' ? x : x.entity) === eid);
+    const msg = typeof t === 'object' && t.confirmation;
+    if (msg && !confirm(msg)) return;
+    const wasOn = btn.classList.contains('on');
+    btn.classList.toggle('on', !wasOn);
+    btn.classList.add('pending');
+    btn.textContent = wasOn ? 'OFF' : 'ON';
+    btn.setAttribute('aria-checked', String(!wasOn));
+    clearTimeout(this._pending[eid]);
+    // If HA never reports a change (e.g. an automation flips it straight back), resync after 4s.
+    this._pending[eid] = setTimeout(() => { delete this._pending[eid]; this._lastSig = null; this._render(); }, 4000);
+    this._callToggle(eid);
   }
   _runAction(key) {
     const a = this._config[key] || (key==='tap_action'?'navigate':'toggle-pump');
@@ -336,8 +446,8 @@ class WaterTankCard extends HTMLElement {
   _handleTap()  { if (this._hass && this._config) this._runAction('tap_action'); }
   _handleHold() { if (this._hass && this._config) this._runAction('hold_action'); }
 
-  _bindEvents() {
-    const el = this.shadowRoot.querySelector('.card-touch');
+  _bindEvents(sel = '.card-touch') {
+    const el = this.shadowRoot.querySelector(sel);
     if (!el || el._bound) return;
     el._bound = true;
     el.addEventListener('pointerdown', () => {
@@ -346,6 +456,8 @@ class WaterTankCard extends HTMLElement {
     });
     el.addEventListener('pointerup', () => { clearTimeout(this._holdTimer); if (!this._isHold) this._handleTap(); });
     el.addEventListener('pointerleave', () => clearTimeout(this._holdTimer));
+    el.addEventListener('pointercancel', () => { clearTimeout(this._holdTimer); this._isHold = true; });
+    el.addEventListener('contextmenu', e => e.preventDefault());
   }
 
   _render() {
@@ -353,7 +465,7 @@ class WaterTankCard extends HTMLElement {
     const c = this._config;
     const mode = c.mode || 'compact';
     const level = this._hass.states[c.entity_level];
-    const title = c.title || 'Water Tank';
+    const title = WTC_ESC(c.title || 'Water Tank');
     const warnBelow = c.warn_below ?? 50;
 
     // ── Unavailable state ───────────────────────────────────
@@ -460,33 +572,37 @@ class WaterTankCard extends HTMLElement {
       `<div class="stat-row"><span class="stat-icon">${icon}</span><span class="stat-label">${label}</span><span class="stat-val">${val}${unit?' <small>'+unit+'</small>':''}</span></div>`;
 
     const litresVal = c.entity_liters && this._stateVal(c.entity_liters) !== '—'
-      ? this._stateVal(c.entity_liters) : litresText.replace(' L','').replace(',','');
+      ? this._stateVal(c.entity_liters) : litresText.replace(/\s*L$/,'');
 
-    const statsPanel = `
-      <div class="stats-panel">
-        ${row('💧','Litres left',  litresVal, 'L')}
-        ${row('🚿','Used today',   this._stateVal(c.entity_daily_used), 'L')}
-        ${row('⏱️','Pump today',   this._minsText(c.entity_pump_today))}
-        ${row('⚡','Power now',    this._stateVal(c.entity_power, 2), 'kW')}
-        ${row('📅','Daily kWh',    this._stateVal(c.entity_daily_kwh, 2), 'kWh')}
-        ${row('📆','Monthly kWh',  this._stateVal(c.entity_monthly_kwh, 2), 'kWh')}
-      </div>`;
+    // Only rows whose entity (or fallback) is configured are shown
+    const statRows = [
+      litresText                ? row('💧','Litres left', litresVal, 'L') : '',
+      c.entity_daily_used       ? row('🚿','Used today',  this._stateVal(c.entity_daily_used), 'L') : '',
+      c.entity_pump_today       ? row('⏱️','Pump today',  this._minsText(c.entity_pump_today)) : '',
+      c.entity_power            ? row('⚡','Power now',   this._stateVal(c.entity_power, this._unit(c.entity_power,'kW') === 'W' ? 0 : 2), this._unit(c.entity_power, 'kW')) : '',
+      c.entity_daily_kwh        ? row('📅','Daily kWh',   this._stateVal(c.entity_daily_kwh, 2), 'kWh') : '',
+      c.entity_monthly_kwh      ? row('📆','Monthly kWh', this._stateVal(c.entity_monthly_kwh, 2), 'kWh') : '',
+    ].join('');
+    const statsPanel = statRows ? `<div class="stats-panel">${statRows}</div>` : '';
 
     // Toggles panel — entities listed under `toggles` config key
     const toggles = c.toggles || [];
     const toggleRows = toggles.map(t => {
-      const eid = typeof t === 'string' ? t : t.entity;
-      const lbl = (typeof t === 'object' && t.name) || (this._hass.states[eid]?.attributes?.friendly_name) || eid;
-      const icon = (typeof t === 'object' && t.icon) || null;
+      const eid = typeof t === 'string' ? t : t?.entity;
+      if (!eid) return '';
       const s = this._hass.states[eid];
-      const on = s?.state === 'on';
+      const lbl = WTC_ESC((typeof t === 'object' && t.name) || s?.attributes?.friendly_name || eid);
+      const icon = (typeof t === 'object' && t.icon) || s?.attributes?.icon || null;
+      const bad = WTC_BAD(s);
+      const on = !bad && WTC_ON_STATES.includes(s.state);
       const iconHtml = icon
-        ? `<ha-icon icon="${icon}" style="color:${on?'var(--state-icon-active-color,#fbc02d)':'var(--disabled-color,rgba(255,255,255,.3))'}"></ha-icon>`
+        ? `<ha-icon icon="${WTC_ESC(icon)}" style="color:${on?'var(--state-icon-active-color,#fbc02d)':'var(--disabled-color,rgba(255,255,255,.3))'}"></ha-icon>`
         : `<span style="width:24px;display:inline-block"></span>`;
-      return `<div class="toggle-row" data-entity="${eid}">
+      const txt = bad ? 'N/A' : on ? 'ON' : 'OFF';
+      return `<div class="toggle-row" data-entity="${WTC_ESC(eid)}">
         <span class="tog-icon">${iconHtml}</span>
         <span class="tog-label">${lbl}</span>
-        <button class="tog-btn ${on?'on':''}" data-entity="${eid}" aria-checked="${on}">${on?'ON':'OFF'}</button>
+        <button class="tog-btn ${on?'on':''}" role="switch" data-entity="${WTC_ESC(eid)}" aria-checked="${on}" aria-label="${lbl}"${bad?' disabled title="Entity unavailable"':''}>${txt}</button>
       </div>`;
     }).join('');
 
@@ -522,7 +638,10 @@ class WaterTankCard extends HTMLElement {
         .tog-label{flex:1;font-size:13px;color:var(--primary-text-color,#fff)}
         .tog-btn{border:none;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;min-width:42px;transition:background .2s}
         .tog-btn.on{background:#43a047;color:#fff}
-        .tog-btn:not(.on){background:rgba(255,255,255,.12);color:var(--secondary-text-color,rgba(255,255,255,.5))}
+        .tog-btn:not(.on){background:var(--secondary-background-color,rgba(255,255,255,.12));color:var(--secondary-text-color,rgba(255,255,255,.5))}
+        .tog-btn.pending{opacity:.6;cursor:progress}
+        .tog-btn:disabled{opacity:.4;cursor:not-allowed}
+        .tog-btn:focus-visible{outline:2px solid var(--primary-color,#03a9f4);outline-offset:2px}
         /* Stats */
         .stats-panel{display:flex;flex-direction:column;gap:6px}
         .stat-row{display:flex;align-items:center;gap:8px;font-size:13px}
@@ -559,28 +678,22 @@ class WaterTankCard extends HTMLElement {
       </ha-card>`;
 
     // Tank column tap/hold
-    const tankCol = this.shadowRoot.querySelector('.tank-col');
-    if (tankCol && !tankCol._bound) {
-      tankCol._bound = true;
-      tankCol.addEventListener('pointerdown', () => { this._isHold=false; this._holdTimer=setTimeout(()=>{this._isHold=true;this._handleHold();},500); });
-      tankCol.addEventListener('pointerup', () => { clearTimeout(this._holdTimer); if (!this._isHold) this._handleTap(); });
-      tankCol.addEventListener('pointerleave', () => clearTimeout(this._holdTimer));
-    }
+    this._bindEvents('.tank-col');
+    // Pump icon: its own action — must not also trigger the tank's tap/hold
     const pi = this.shadowRoot.querySelector('#pumpIcon');
-    if (pi) pi.addEventListener('click', e => { e.stopPropagation(); this._togglePump(); });
+    if (pi) {
+      ['pointerdown','pointerup'].forEach(ev => pi.addEventListener(ev, e => e.stopPropagation()));
+      pi.addEventListener('click', e => { e.stopPropagation(); this._togglePump(); });
+    }
 
     // Toggle buttons
     this.shadowRoot.querySelectorAll('.tog-btn').forEach(btn => {
-      btn.addEventListener('click', e => {
-        e.stopPropagation();
-        const eid = btn.dataset.entity;
-        if (eid) this._hass.callService('switch', 'toggle', { entity_id: eid });
-      });
+      btn.addEventListener('click', e => { e.stopPropagation(); this._onToggleClick(btn); });
     });
   }
 }
 
 customElements.define('water-tank-card', WaterTankCard);
 window.customCards = window.customCards || [];
-window.customCards.push({ type:'water-tank-card', name:'Water Tank Card', description:'Animated SVG water tank — compact & full modes', preview:true, documentationURL:'https://github.com/HybridRCG/water-tank-card' });
+window.customCards.push({ type:'water-tank-card', name:'Water Tank Card', description:'Animated SVG water tank — compact, medium & full modes with toggles and stats', preview:true, documentationURL:'https://github.com/HybridRCG/water-tank-card' });
 console.info('%c WATER-TANK-CARD %c v'+CARD_VERSION,'color:#fff;background:#1565c0;padding:2px 6px;border-radius:3px 0 0 3px;font-weight:bold;','color:#1565c0;background:#e3f2fd;padding:2px 6px;border-radius:0 3px 3px 0;');
