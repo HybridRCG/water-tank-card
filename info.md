@@ -12,3 +12,5 @@ Animated SVG water tank card for Home Assistant. Shows real-time fill level, pum
 - Custom fill colour or automatic red→green gradient
 - Pump toggle with confirmation dialog
 - Adapts to light and dark HA themes
+
+☕ Enjoying the card? [Buy me a coffee](https://buymeacoffee.com/hybridrcg)

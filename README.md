@@ -2,6 +2,7 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![GitHub release](https://img.shields.io/github/v/release/HybridRCG/water-tank-card)](https://github.com/HybridRCG/water-tank-card/releases)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/hybridrcg)
 
 A custom Home Assistant Lovelace card displaying an animated SVG water tank with real-time fill level, pump controls, stats panel, and 24h history sparkline. Designed as a self-contained card — no horizontal-stack or markdown cards needed.
 
@@ -180,6 +181,14 @@ Buttons flip instantly when tapped and then follow the real entity state. If HA 
 
 ---
 
+## Support
+
+If this card is useful to you, consider buying me a coffee ☕
+
+<a href="https://buymeacoffee.com/hybridrcg" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" height="41"></a>
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE)
@@ -187,6 +196,9 @@ MIT — see [LICENSE](LICENSE)
 ---
 
 ## Changelog
+
+### 4.2.2
+- **Docs:** Buy Me a Coffee link (README badge, Support section, HACS info page, GitHub Sponsor button)
 
 ### 4.2.1
 - **Docs:** screenshots added — live dashboard photo plus rendered compact, medium and full modes (normal and low water) in `images/`
