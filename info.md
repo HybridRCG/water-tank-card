@@ -1,5 +1,7 @@
 # Water Tank Card
 
+<img src="https://raw.githubusercontent.com/HybridRCG/water-tank-card/main/images/compact-live.png" width="140"> <img src="https://raw.githubusercontent.com/HybridRCG/water-tank-card/main/images/medium.png" width="420">
+
 Animated SVG water tank card for Home Assistant. Shows real-time fill level, pump status, capacity in litres, and a 24-hour history sparkline.
 
 **Features at a glance:**

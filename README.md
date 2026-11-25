@@ -5,6 +5,26 @@
 
 A custom Home Assistant Lovelace card displaying an animated SVG water tank with real-time fill level, pump controls, stats panel, and 24h history sparkline. Designed as a self-contained card — no horizontal-stack or markdown cards needed.
 
+<p align="center">
+  <img src="images/compact-live.png" alt="Compact card on a live Home Assistant dashboard" width="180">
+  &nbsp;&nbsp;
+  <img src="images/medium.png" alt="Medium mode — tank, sparkline, toggles and stats" width="520">
+</p>
+
+---
+
+## Screenshots
+
+| Compact | Compact — low water | Compact row |
+|:---:|:---:|:---:|
+| <img src="images/compact.png" width="200" alt="Compact mode, 92%, pump running"> | <img src="images/compact-low.png" width="200" alt="Compact mode below warn_below threshold"> | <img src="images/compact-row.png" width="360" alt="Three compact cards side by side"> |
+
+| Medium | Full | Full — low water |
+|:---:|:---:|:---:|
+| <img src="images/medium.png" width="340" alt="Medium mode"> | <img src="images/full.png" width="200" alt="Full mode"> | <img src="images/full-low.png" width="200" alt="Full mode with low water warning"> |
+
+*`compact-live.png` is from a real dashboard; the rest are rendered from `water-tank-card.js` with demo data and the default dark theme. To regenerate them, open `tools/demo.html?mode=compact|medium|full&level=78&pump=on` in a browser (no Home Assistant needed).*
+
 ---
 
 ## Features
@@ -49,6 +69,8 @@ A custom Home Assistant Lovelace card displaying an animated SVG water tank with
 ### Compact
 110 px card, fits alongside standard button cards. Shows animated tank + `Title — 96%` label. Label turns red below `warn_below` threshold.
 
+<img src="images/compact-row.png" alt="Compact cards" width="480">
+
 ```yaml
 type: custom:water-tank-card
 entity_level: sensor.jojo_tank_level_liquid_level
@@ -60,8 +82,12 @@ warn_below: 50
 ### Medium
 Two-column self-contained card. Tank + sparkline on the left, toggles + stats on the right. Best at full dashboard width.
 
+<img src="images/medium.png" alt="Medium mode" width="520">
+
 ### Full
 Stacked layout — enlarged tank on top, toggles + stats panel below. Best in a narrow column or on mobile.
+
+<img src="images/full.png" alt="Full mode" width="260">
 
 Medium and full take the same options:
 

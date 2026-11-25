@@ -1,0 +1,71 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  :root{
+    --card-background-color:#1c1c1c; --primary-text-color:#e1e1e1; --secondary-text-color:#9b9b9b;
+    --divider-color:rgba(225,225,225,.12); --secondary-background-color:#2b2b2b; --primary-color:#03a9f4;
+    --error-color:#ef4444; --state-icon-active-color:#fbc02d; --disabled-color:rgba(255,255,255,.3);
+  }
+  html,body{margin:0;background:#111111;font-family:Roboto,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif}
+  #stage{padding:16px;display:inline-block}
+  water-tank-card{display:block}
+  ha-icon{display:inline-flex;width:24px;height:24px}
+  ha-icon svg{width:100%;height:100%;fill:currentColor}
+  .row{display:flex;gap:12px}
+</style></head>
+<body><div id="stage"></div>
+<script>
+const MDI = {"mdi:electric-switch":"M1,11H3.17C3.58,9.83 4.69,9 6,9C6.65,9 7.25,9.21 7.74,9.56L14.44,4.87L15.58,6.5L8.89,11.2C8.96,11.45 9,11.72 9,12A3,3 0 0,1 6,15C4.69,15 3.58,14.17 3.17,13H1V11M23,11V13H20.83C20.42,14.17 19.31,15 18,15A3,3 0 0,1 15,12A3,3 0 0,1 18,9C19.31,9 20.42,9.83 20.83,11H23M6,11A1,1 0 0,0 5,12A1,1 0 0,0 6,13A1,1 0 0,0 7,12A1,1 0 0,0 6,11M18,11A1,1 0 0,0 17,12A1,1 0 0,0 18,13A1,1 0 0,0 19,12A1,1 0 0,0 18,11Z","mdi:water-pump":"M19,14.5C19,14.5 21,16.67 21,18A2,2 0 0,1 19,20A2,2 0 0,1 17,18C17,16.67 19,14.5 19,14.5M5,18V9A2,2 0 0,1 3,7A2,2 0 0,1 5,5V4A2,2 0 0,1 7,2H9A2,2 0 0,1 11,4V5H19A2,2 0 0,1 21,7V9L21,11A1,1 0 0,1 22,12A1,1 0 0,1 21,13H17A1,1 0 0,1 16,12A1,1 0 0,1 17,11V9H11V18H12A2,2 0 0,1 14,20V22H2V20A2,2 0 0,1 4,18H5Z","mdi:message-alert":"M13 11H11V5H13M13 15H11V13H13M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"};
+customElements.define('ha-card', class extends HTMLElement {
+  constructor(){ super(); this.attachShadow({mode:'open'}).innerHTML = '<style>:host{display:block;border-radius:12px;background:var(--card-background-color);color:var(--primary-text-color);box-sizing:border-box}</style><slot></slot>'; }
+});
+customElements.define('ha-icon', class extends HTMLElement {
+  connectedCallback(){ const d = MDI[this.getAttribute('icon')]; this.innerHTML = d ? `<svg viewBox="0 0 24 24"><path d="${d}"/></svg>` : ''; }
+});
+</script>
+<script src="../water-tank-card.js"></script>
+<script>
+const q = new URLSearchParams(location.search);
+const mode = q.get('mode') || 'compact';
+const level = parseFloat(q.get('level') || '92');
+const pumpOn = q.get('pump') === 'on';
+const width = parseInt(q.get('w') || (mode === 'compact' ? '200' : mode === 'medium' ? '640' : '380'));
+const now = Date.now(), ago = m => new Date(now - m*60000).toISOString();
+const st = (state, unit, name, changed=ago(4)) => ({ state:String(state), last_changed:changed, attributes:{ unit_of_measurement:unit, friendly_name:name } });
+const states = {
+  'sensor.jojo_tank_level_liquid_level': st(level, '%', 'Jojo level'),
+  'sensor.jojo_liters_left': st(Math.round(level*50), 'L', 'Litres left'),
+  'switch.borehole': st(pumpOn?'on':'off', undefined, 'Borehole', ago(47)),
+  'switch.borehole_enabled': st('on', undefined, 'Automated'),
+  'switch.notifyjojo': st('off', undefined, 'Notify'),
+  'input_number.jojo_daily_water_used': st(1240, 'L', 'Used today'),
+  'sensor.borehole_on_today': st(2.45, 'h', 'Pump today'),
+  'sensor.borehole_power': st(pumpOn?1180:0, 'W', 'Power'),
+  'sensor.borehole_daily_consumption': st(2.9, 'kWh', 'Daily'),
+  'sensor.borehole_monthly_consumption': st(61.4, 'kWh', 'Monthly'),
+};
+// Synthetic 24h history: slow drain with two pump refills
+const hist = []; let v = 70;
+for (let i = 0; i <= 96; i++) {
+  if ((i > 30 && i < 40) || (i > 70 && i < 80)) v = Math.min(100, v + 3); else v = Math.max(5, v - 0.55);
+  hist.push({ state: v.toFixed(1), last_changed: new Date(now - (96-i)*15*60000).toISOString() });
+}
+hist[hist.length-1].state = String(level);
+const hass = { states, callApi: async () => [hist], callService: () => {} };
+const base = { entity_level:'sensor.jojo_tank_level_liquid_level', title: q.get('title') || 'Jojo', mode, warn_below:50, pump_entity:'switch.borehole' };
+const full = { ...base, title: q.get('title') || 'Water Tank', entity_liters:'sensor.jojo_liters_left', tank_capacity:5000,
+  entity_daily_used:'input_number.jojo_daily_water_used', entity_pump_today:'sensor.borehole_on_today',
+  entity_power:'sensor.borehole_power', entity_daily_kwh:'sensor.borehole_daily_consumption', entity_monthly_kwh:'sensor.borehole_monthly_consumption',
+  toggles:[{entity:'switch.borehole',name:'Borehole',icon:'mdi:electric-switch'},{entity:'switch.borehole_enabled',name:'Automated',icon:'mdi:water-pump'},{entity:'switch.notifyjojo',name:'Notify',icon:'mdi:message-alert'}] };
+const stage = document.getElementById('stage');
+function make(cfg, w){ const c = document.createElement('water-tank-card'); c.style.width = w+'px'; c.setConfig(cfg); stage.appendChild(c); c.hass = hass; return c; }
+if (mode === 'compact-row') {
+  stage.style.display = 'flex'; stage.style.gap = '12px';
+  [[92,'Jojo'],[38,'Garden'],[67,'House']].forEach(([l,t]) => {
+    const s2 = {...states, ['sensor.lvl_'+t]: st(l,'%',t)}; const c = document.createElement('water-tank-card');
+    c.style.width='200px'; c.setConfig({...base, mode:'compact', title:t, entity_level:'sensor.lvl_'+t}); stage.appendChild(c); c.hass = {...hass, states:s2};
+  });
+} else {
+  make(mode === 'compact' ? base : full, width);
+}
+</script></body></html>
