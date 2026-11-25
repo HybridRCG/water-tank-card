@@ -1,4 +1,4 @@
-const CARD_VERSION = '4.2.0';
+const CARD_VERSION = '4.2.1';
 
 // ── Shared helpers ─────────────────────────────────────────
 const WTC_ESC = s => String(s ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));

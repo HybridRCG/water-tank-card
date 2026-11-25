@@ -188,6 +188,11 @@ MIT — see [LICENSE](LICENSE)
 
 ## Changelog
 
+### 4.2.1
+- **Docs:** screenshots added — live dashboard photo plus rendered compact, medium and full modes (normal and low water) in `images/`
+- **Docs:** README screenshot gallery and per-mode previews; HACS info page now shows images
+- **New:** `tools/demo.html` — renders the card with mock data in any browser (no Home Assistant needed) to regenerate screenshots
+
 ### 4.2.0
 - **Fix:** toggle buttons (e.g. *Automated*) now update when their state changes — previously the card only redrew on tank level or pump changes, so a button kept showing ON and the next tap turned it back on
 - **Fix:** toggles and the pump now call the right service per domain (`input_boolean`, `automation`, `light`, … no longer fail silently)
