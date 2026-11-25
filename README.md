@@ -6,6 +6,8 @@
 
 A custom Home Assistant Lovelace card displaying an animated SVG water tank with real-time fill level, pump controls, stats panel, and 24h history sparkline. Designed as a self-contained card — no horizontal-stack or markdown cards needed.
 
+<a href="https://buymeacoffee.com/hybridrcg" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" height="41"></a>
+
 <p align="center">
   <img src="images/compact-live.png" alt="Compact card on a live Home Assistant dashboard" width="180">
   &nbsp;&nbsp;
@@ -196,6 +198,9 @@ MIT — see [LICENSE](LICENSE)
 ---
 
 ## Changelog
+
+### 4.2.3
+- **Docs:** Buy Me a Coffee button also shown at the top of the README and HACS info page
 
 ### 4.2.2
 - **Docs:** Buy Me a Coffee link (README badge, Support section, HACS info page, GitHub Sponsor button)
